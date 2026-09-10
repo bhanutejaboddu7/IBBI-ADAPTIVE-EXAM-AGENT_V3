@@ -1,13 +1,33 @@
-const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 
-const db = new Database(path.join(__dirname, 'ibbi_exam.db'));
+let db;
+let isMemoryMode = false;
 
-// Enable WAL mode for better performance
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+if (process.env.VERCEL || process.env.USE_MEMORY_DB) {
+  isMemoryMode = true;
+} else {
+  try {
+    const Database = require('better-sqlite3');
+    db = new Database(path.join(__dirname, 'ibbi_exam.db'));
+    db.pragma('journal_mode = WAL');
+    db.pragma('foreign_keys = ON');
+  } catch (err) {
+    console.warn('better-sqlite3 unavailable, using MemoryDB engine:', err.message);
+    isMemoryMode = true;
+  }
+}
+
+if (isMemoryMode) {
+  const MemoryDB = require('./memory_db');
+  const seedPath = path.join(__dirname, 'data', 'ibbi_data.json');
+  db = new MemoryDB(seedPath);
+}
 
 function initDB() {
+  if (isMemoryMode) {
+    return;
+  }
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,

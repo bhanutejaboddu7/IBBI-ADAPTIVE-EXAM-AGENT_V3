@@ -855,9 +855,21 @@ app.get('/api/study/progress', (req, res) => {
   res.json(progress);
 });
 
+// Fallback route to serve index.html for client-side routing
+app.use((req, res, next) => {
+  if (req.method === 'GET' && !req.path.startsWith('/api')) {
+    return res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  }
+  next();
+});
+
 // ─── START SERVER ─────────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
-  console.log(`\n🚀 IBBI Adaptive Exam Agent running at http://localhost:${PORT}\n`);
-  console.log(`📌 Add your OpenAI API key to .env file: OPENAI_API_KEY=sk-...\n`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`\n🚀 IBBI Adaptive Exam Agent running at http://localhost:${PORT}\n`);
+  });
+}
+
+module.exports = app;
+

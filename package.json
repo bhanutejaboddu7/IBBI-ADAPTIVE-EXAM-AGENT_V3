@@ -1,23 +1,25 @@
 {
-  "name": "kiran",
+  "name": "ibbi-adaptive-exam-agent",
   "version": "1.0.0",
-  "description": "",
+  "description": "IBBI Limited Insolvency Examination Preparation Platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js"
   },
-  "keywords": [],
+  "keywords": ["ibbi", "exam", "cirp", "insolvency"],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "better-sqlite3": "^13.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "openai": "^4.67.0",
     "uuid": "^9.0.0"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^13.0.0"
   }
-}
+}
