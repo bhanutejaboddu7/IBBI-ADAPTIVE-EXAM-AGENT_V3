@@ -1,0 +1,2249 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IBBI Adaptive Exam Agent — Limited Insolvency Examination</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+  
+  <!-- Fonts & FontAwesome -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Chart.js, Marked.js, Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace']
+          },
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              400: '#60a5fa',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; animation: fadeIn 0.15s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+    
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(245, 158, 11, 0.7); }
+
+    .sidebar-item.active {
+      background-color: #1e293b;
+      color: #ffffff;
+      border-left: 4px solid #f59e0b;
+      font-weight: 600;
+    }
+
+    .sidebar-item:not(.active) {
+      color: #94a3b8;
+      border-left: 4px solid transparent;
+    }
+
+    .sidebar-item:not(.active):hover {
+      background-color: rgba(30, 41, 59, 0.6);
+      color: #f1f5f9;
+    }
+
+    .prose-legal p { margin-bottom: 0.65rem; }
+    .prose-legal ul { list-style-type: disc; padding-left: 1.25rem; margin-bottom: 0.65rem; }
+    .prose-legal ol { list-style-type: decimal; padding-left: 1.25rem; margin-bottom: 0.65rem; }
+    .prose-legal strong { font-weight: 700; }
+    .dark .prose-legal strong { color: #f8fafc; }
+    .light .prose-legal strong { color: #0f172a; }
+    .prose-legal code { font-family: 'JetBrains Mono', monospace; padding: 0.15rem 0.35rem; border-radius: 0.35rem; font-size: 0.85em; }
+    .dark .prose-legal code { background: rgba(30, 41, 59, 0.8); color: #93c5fd; }
+    .light .prose-legal code { background: rgba(219, 234, 254, 0.7); color: #1e40af; }
+    
+    .palette-answered { background-color: #059669 !important; color: white !important; border-color: #10b981 !important; }
+    .palette-review { background-color: #7c3aed !important; color: white !important; border-color: #8b5cf6 !important; }
+  </style>
+</head>
+
+<body class="bg-[#f8fafc] text-slate-800 dark:bg-[#0b0f19] dark:text-slate-100 min-h-screen flex flex-col md:flex-row antialiased transition-colors duration-200">
+
+  <!-- TOAST NOTIFICATIONS -->
+  <div id="toast-container" class="fixed top-5 right-5 z-[9999] flex flex-col space-y-2 pointer-events-none"></div>
+
+  <!-- KEYBOARD SHORTCUTS MODAL -->
+  <div id="shortcuts-modal" class="fixed inset-0 z-[9998] bg-slate-950/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+        <h3 class="font-bold text-slate-900 dark:text-white flex items-center gap-2 text-sm">
+          <i class="fa-solid fa-keyboard text-amber-500"></i> Examination Keyboard Shortcuts
+        </h3>
+        <button onclick="toggleShortcutsModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="space-y-2.5 text-xs text-slate-700 dark:text-slate-300">
+        <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-800/60 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
+          <span>Select Option A, B, C, D</span>
+          <span class="space-x-1">
+            <kbd class="font-mono bg-slate-200 dark:bg-slate-950 px-2 py-0.5 rounded text-slate-800 dark:text-slate-200 font-bold border border-slate-300 dark:border-slate-700">1-4</kbd>
+            <kbd class="font-mono bg-slate-200 dark:bg-slate-950 px-2 py-0.5 rounded text-slate-800 dark:text-slate-200 font-bold border border-slate-300 dark:border-slate-700">A-D</kbd>
+          </span>
+        </div>
+        <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-800/60 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
+          <span>Save & Next Question</span>
+          <kbd class="font-mono bg-slate-200 dark:bg-slate-950 px-2 py-0.5 rounded text-slate-800 dark:text-slate-200 font-bold border border-slate-300 dark:border-slate-700">&rarr; Right Arrow</kbd>
+        </div>
+        <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-800/60 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
+          <span>Previous Question</span>
+          <kbd class="font-mono bg-slate-200 dark:bg-slate-950 px-2 py-0.5 rounded text-slate-800 dark:text-slate-200 font-bold border border-slate-300 dark:border-slate-700">&larr; Left Arrow</kbd>
+        </div>
+        <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-800/60 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
+          <span>Mark Question for Review</span>
+          <kbd class="font-mono bg-slate-200 dark:bg-slate-950 px-2 py-0.5 rounded text-slate-800 dark:text-slate-200 font-bold border border-slate-300 dark:border-slate-700">M</kbd>
+        </div>
+        <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-800/60 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
+          <span>Clear Selection</span>
+          <kbd class="font-mono bg-slate-200 dark:bg-slate-950 px-2 py-0.5 rounded text-slate-800 dark:text-slate-200 font-bold border border-slate-300 dark:border-slate-700">C</kbd>
+        </div>
+      </div>
+      <button onclick="toggleShortcutsModal()" class="w-full bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-200 py-2.5 rounded-xl text-xs font-semibold transition">Close Guide</button>
+    </div>
+  </div>
+
+  <!-- ════════════════════ LEFT SIDEBAR NAVIGATION ════════════════════ -->
+  <aside class="w-full md:w-60 bg-[#0f172a] text-slate-300 flex-shrink-0 flex flex-col justify-between select-none border-r border-slate-800">
+    <div>
+      <!-- BRAND HEADER -->
+      <div class="p-5 pb-6 border-b border-slate-800/80">
+        <h1 class="text-amber-500 font-bold text-base tracking-tight leading-tight">IBBI Adaptive</h1>
+        <h2 class="text-amber-500 font-bold text-base tracking-tight leading-tight">Exam Agent</h2>
+        <p class="text-[11px] text-slate-400 mt-1">Limited Insolvency Examination</p>
+      </div>
+
+      <!-- NAVIGATION LINKS -->
+      <nav class="py-3 space-y-0.5 text-xs font-medium">
+        <button onclick="switchTab('dashboard')" class="sidebar-item active w-full flex items-center gap-3 px-5 py-3 transition text-left" data-tab="dashboard">
+          <span class="w-5 text-center text-sm">📊</span>
+          <span>Dashboard</span>
+        </button>
+
+        <button onclick="switchTab('chat')" class="sidebar-item w-full flex items-center gap-3 px-5 py-3 transition text-left" data-tab="chat">
+          <span class="w-5 text-center text-sm">🤖</span>
+          <span>AI Tutor</span>
+        </button>
+
+        <button onclick="switchTab('syllabus')" class="sidebar-item w-full flex items-center gap-3 px-5 py-3 transition text-left" data-tab="syllabus">
+          <span class="w-5 text-center text-sm">📋</span>
+          <span>Syllabus</span>
+        </button>
+
+        <button onclick="switchTab('mock')" class="sidebar-item w-full flex items-center gap-3 px-5 py-3 transition text-left" data-tab="mock">
+          <span class="w-5 text-center text-sm">📝</span>
+          <span>Mock Test</span>
+        </button>
+
+        <button onclick="switchTab('caselaws')" class="sidebar-item w-full flex items-center gap-3 px-5 py-3 transition text-left" data-tab="caselaws">
+          <span class="w-5 text-center text-sm">⚖️</span>
+          <span>Case Laws</span>
+        </button>
+
+        <button onclick="switchTab('casestudies')" class="sidebar-item w-full flex items-center gap-3 px-5 py-3 transition text-left" data-tab="casestudies">
+          <span class="w-5 text-center text-sm">📖</span>
+          <span>Case Studies</span>
+        </button>
+
+        <button onclick="switchTab('weakareas')" class="sidebar-item w-full flex items-center gap-3 px-5 py-3 transition text-left" data-tab="weakareas">
+          <span class="w-5 text-center text-sm">⚠️</span>
+          <span>Weak Areas</span>
+        </button>
+
+        <button onclick="switchTab('progress')" class="sidebar-item w-full flex items-center gap-3 px-5 py-3 transition text-left" data-tab="progress">
+          <span class="w-5 text-center text-sm">📈</span>
+          <span>Progress</span>
+        </button>
+
+        <button onclick="switchTab('history')" class="sidebar-item w-full flex items-center gap-3 px-5 py-3 transition text-left" data-tab="history">
+          <span class="w-5 text-center text-sm">🕒</span>
+          <span>History</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- SIDEBAR FOOTER: SYLLABUS STAMP -->
+    <div class="p-4 border-t border-slate-800/80 text-[10px] text-slate-500 space-y-1">
+      <div>IBC 2016 • Amended Feb 2025</div>
+      <div>Curriculum Effective May 2025</div>
+    </div>
+  </aside>
+
+  <!-- ════════════════════ MAIN CONTENT AREA ════════════════════ -->
+  <div class="flex-1 flex flex-col min-h-screen overflow-x-hidden">
+    
+    <!-- TOP BAR -->
+    <header class="h-16 bg-white dark:bg-[#0f172a] border-b border-slate-200 dark:border-slate-800 px-6 flex items-center justify-between sticky top-0 z-30 transition-colors shadow-sm">
+      <h2 id="topbar-title" class="text-xl font-bold text-slate-900 dark:text-white">Dashboard</h2>
+
+      <div class="flex items-center space-x-3">
+        <!-- DAYS TO EXAM PILL (Matching Screenshot) -->
+        <div class="bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800 px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 shadow-sm">
+          <span>📅</span>
+          <span id="top-days-to-exam">0 days to exam</span>
+        </div>
+
+        <!-- KEYBOARD SHORTCUTS -->
+        <button onclick="toggleShortcutsModal()" title="Keyboard Shortcuts" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs transition flex items-center justify-center">
+          <i class="fa-solid fa-keyboard"></i>
+        </button>
+
+        <!-- LIGHT / DARK MODE TOGGLE BUTTON -->
+        <button id="theme-toggle-btn" onclick="toggleThemeMode()" title="Toggle Light / Dark Mode" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-amber-400 border border-slate-200 dark:border-slate-700 text-xs transition flex items-center justify-center">
+          <i id="theme-toggle-icon" class="fa-solid fa-moon"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- CONTENT BODY -->
+    <main class="flex-1 p-6 sm:p-8 space-y-6">
+
+      <!-- ────────────────── 1. DASHBOARD ────────────────── -->
+      <section id="pane-dashboard" class="tab-pane active space-y-6">
+        
+        <!-- 4 TOP STAT CARDS (Exact design as uploaded screenshot) -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          
+          <!-- Card 1: QUESTIONS ATTEMPTED -->
+          <div class="bg-white dark:bg-[#131d31] rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 text-center shadow-sm">
+            <h3 id="stat-q-attempted" class="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white font-mono">0</h3>
+            <p class="text-[11px] font-bold tracking-wider text-slate-400 uppercase mt-2">QUESTIONS ATTEMPTED</p>
+          </div>
+
+          <!-- Card 2: OVERALL ACCURACY -->
+          <div class="bg-white dark:bg-[#131d31] rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 text-center shadow-sm">
+            <h3 id="stat-accuracy" class="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white font-mono">0%</h3>
+            <p class="text-[11px] font-bold tracking-wider text-slate-400 uppercase mt-2">OVERALL ACCURACY</p>
+            <p id="stat-correct-subtext" class="text-xs text-slate-500 dark:text-slate-400 mt-1">0 correct</p>
+          </div>
+
+          <!-- Card 3: MOCKS COMPLETED -->
+          <div class="bg-white dark:bg-[#131d31] rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 text-center shadow-sm">
+            <h3 id="stat-mocks-done" class="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white font-mono">0</h3>
+            <p class="text-[11px] font-bold tracking-wider text-slate-400 uppercase mt-2">MOCKS COMPLETED</p>
+          </div>
+
+          <!-- Card 4: DAYS TO EXAM & READINESS -->
+          <div class="bg-white dark:bg-[#131d31] rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 text-center shadow-sm">
+            <h3 id="stat-days-num" class="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white font-mono">0</h3>
+            <p class="text-[11px] font-bold tracking-wider text-slate-400 uppercase mt-2">DAYS TO EXAM</p>
+            <div class="mt-2">
+              <span id="stat-readiness-badge" class="inline-block px-3.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900">
+                Significant Gaps
+              </span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- LOWER TWO-COLUMN SPLIT (Exact layout as uploaded screenshot) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          
+          <!-- LEFT CARD: Topic Performance -->
+          <div class="bg-white dark:bg-[#131d31] rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+            <h3 class="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+              <span>📊</span>
+              <span>Topic Performance</span>
+            </h3>
+            
+            <div id="topic-perf-list" class="space-y-4 pt-1">
+              <!-- Dynamically populated horizontal progress bars -->
+            </div>
+          </div>
+
+          <!-- RIGHT CARD: Weak Areas (< 60%) -->
+          <div class="bg-white dark:bg-[#131d31] rounded-2xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                <span>⚠️</span>
+                <span>Weak Areas (&lt; 60%)</span>
+              </h3>
+              <button onclick="switchTab('weakareas')" class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-semibold">View All</button>
+            </div>
+
+            <div id="weak-areas-list" class="divide-y divide-slate-100 dark:divide-slate-800/80">
+              <!-- Dynamically populated weak areas list -->
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- ────────────────── 2. AI TUTOR (FACULTY DESK) ────────────────── -->
+      <section id="pane-chat" class="tab-pane">
+        <div class="bg-white dark:bg-[#131d31] border border-slate-200/80 dark:border-slate-800 rounded-2xl flex flex-col h-[78vh] shadow-sm overflow-hidden">
+          
+          <!-- CHAT HEADER -->
+          <div class="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+              <div class="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center text-base shadow-sm">
+                🤖
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="font-bold text-sm text-slate-900 dark:text-white">Insolvency Examination Faculty Desk</h3>
+                  <span class="text-[10px] bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Faculty Active
+                  </span>
+                </div>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">IBC 2016 • Regulations • CIRP • Liquidation • Case Precedents</p>
+              </div>
+            </div>
+            
+            <button onclick="clearChatHistory()" class="text-xs text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-rose-300 dark:hover:border-rose-500/30 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-trash-can text-[11px]"></i> <span>Clear Chat</span>
+            </button>
+          </div>
+
+          <!-- MESSAGES STREAM -->
+          <div id="chat-messages-container" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 scrollbar-thin bg-slate-50/50 dark:bg-slate-950/20">
+            <div class="flex items-start gap-3 max-w-3xl">
+              <div class="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 shadow-sm">
+                AI
+              </div>
+              <div class="bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-2xl rounded-tl-none p-4 text-xs sm:text-sm text-slate-800 dark:text-slate-200 shadow-sm leading-relaxed prose-legal space-y-2">
+                <p>Welcome, candidate. I am your Faculty Mentor for the <strong>Limited Insolvency Examination</strong>.</p>
+                <p>Feel free to consult on section interpretations (e.g. Section 7, 9, 14, 29A, 53), Supreme Court precedents (<em>Essar Steel, Swiss Ribbons, Innoventive</em>), resolution plan voting thresholds, or liquidation waterfall distributions.</p>
+                <div class="pt-1">
+                  <span class="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block mb-1">Select a prompt below or type your question:</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- QUICK PROMPT PILLS -->
+          <div class="px-4 py-2.5 bg-slate-100/70 dark:bg-slate-950/60 border-t border-slate-200 dark:border-slate-800 flex items-center space-x-2 overflow-x-auto scrollbar-thin text-xs">
+            <button onclick="sendChatMessage('Explain Section 7 CIRP initiation requirements, financial debt criteria, and the 14-day NCLT timeline.')" class="shrink-0 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-white px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 transition flex items-center gap-1.5 shadow-sm">
+              <span>Section 7 (Financial Creditor)</span>
+            </button>
+            <button onclick="sendChatMessage('Explain Section 14 moratorium scope, prohibited acts, exceptions, and personal guarantor status.')" class="shrink-0 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-white px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 transition flex items-center gap-1.5 shadow-sm">
+              <span>Section 14 Moratorium</span>
+            </button>
+            <button onclick="sendChatMessage('Explain the Section 53 liquidation waterfall distribution priority order step-by-step.')" class="shrink-0 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-white px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 transition flex items-center gap-1.5 shadow-sm">
+              <span>Section 53 Waterfall</span>
+            </button>
+            <button onclick="sendChatMessage('Explain Section 29A resolution applicant ineligibility provisions with landmark case rulings.')" class="shrink-0 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-white px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 transition flex items-center gap-1.5 shadow-sm">
+              <span>Section 29A Disqualification</span>
+            </button>
+          </div>
+
+          <!-- INPUT FORM -->
+          <div class="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/80">
+            <form id="chat-input-form" onsubmit="handleChatSubmitEvent(event)" class="flex items-center gap-2">
+              <input type="text" id="chat-text-input" placeholder="Ask about any section, case law, CIRP timeline, or exam concept..." autocomplete="off" class="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl px-4 py-3 text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition placeholder-slate-400">
+              <button type="submit" id="chat-submit-btn" class="bg-amber-500 hover:bg-amber-600 text-white px-5 py-3 rounded-xl font-semibold text-xs sm:text-sm transition flex items-center gap-2 shadow-sm disabled:opacity-50">
+                <span>Send</span> <i class="fa-solid fa-paper-plane text-xs"></i>
+              </button>
+            </form>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ────────────────── 3. SYLLABUS ────────────────── -->
+      <section id="pane-syllabus" class="tab-pane space-y-6">
+        <div class="bg-white dark:bg-[#131d31] border border-slate-200/80 dark:border-slate-800 p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+          <div>
+            <h3 class="text-xl font-extrabold text-slate-900 dark:text-white">IBBI Official Syllabus Structure</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">100 Marks Distribution • Track preparation milestone for each topic.</p>
+          </div>
+          <div class="bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-4 py-2 rounded-xl text-xs text-slate-700 dark:text-slate-300">
+            <span>Overall Mastered: </span>
+            <span id="syllabus-mastered-stat" class="font-bold text-emerald-600 dark:text-emerald-400">0%</span>
+          </div>
+        </div>
+
+        <div id="syllabus-cards-container" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <!-- Populated via JS -->
+        </div>
+      </section>
+
+      <!-- ────────────────── 4. MOCK TEST ────────────────── -->
+      <section id="pane-mock" class="tab-pane space-y-6">
+        
+        <!-- LAUNCHER -->
+        <div id="mock-launcher-screen" class="space-y-6">
+          <div class="bg-white dark:bg-[#131d31] border border-slate-200/80 dark:border-slate-800 p-6 rounded-2xl shadow-sm">
+            <h3 class="font-extrabold text-xl text-slate-900 dark:text-white">Examination Modes</h3>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+              Simulates the official Limited Insolvency Examination pattern with -0.25 negative marking.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <!-- Full Mock (100 Marks) -->
+            <div class="bg-white dark:bg-[#131d31] border border-slate-200/80 dark:border-slate-800 hover:border-amber-500 p-6 rounded-2xl flex flex-col justify-between transition group shadow-sm">
+              <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] uppercase font-bold tracking-wider bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 px-2.5 py-1 rounded-full">Official Blueprint</span>
+                  <span class="text-xs font-mono text-slate-500 dark:text-slate-400"><i class="fa-regular fa-clock"></i> 120 Mins</span>
+                </div>
+                <h4 class="font-bold text-lg text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition">Full Length Mock (100 Marks)</h4>
+                <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Complete 100-mark paper dominated by practical Case Studies (70 Marks), Core IBC Sections, Rules, and Allied Laws.
+                </p>
+                <div class="pt-2 text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
+                  <div>• Total Marks: <strong class="text-slate-800 dark:text-white">100 Marks</strong></div>
+                  <div>• Passing Score: <strong class="text-emerald-600 dark:text-emerald-400">60 Marks (60%)</strong></div>
+                  <div>• Negative Marking: <strong class="text-rose-600 dark:text-rose-400">-0.25 per mark</strong></div>
+                </div>
+              </div>
+              <button onclick="startMock('full')" class="mt-6 w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs py-3 rounded-xl shadow-sm transition">
+                Launch Full Examination &rarr;
+              </button>
+            </div>
+
+            <!-- Speed Drill (15 Questions) -->
+            <div class="bg-white dark:bg-[#131d31] border border-slate-200/80 dark:border-slate-800 hover:border-emerald-500/50 p-6 rounded-2xl flex flex-col justify-between transition group shadow-sm">
+              <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] uppercase font-bold tracking-wider bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 px-2.5 py-1 rounded-full">Speed Drill</span>
+                  <span class="text-xs font-mono text-slate-500 dark:text-slate-400"><i class="fa-regular fa-clock"></i> 30 Mins</span>
+                </div>
+                <h4 class="font-bold text-lg text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">15-Question Speed Drill</h4>
+                <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Targeted question set across multiple topics for daily pace, recall, and accuracy testing.
+                </p>
+                <div class="pt-2 text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
+                  <div>• Total Questions: <strong class="text-slate-800 dark:text-white">15 Questions</strong></div>
+                  <div>• Coverage: <strong class="text-slate-800 dark:text-white">Mixed Topics</strong></div>
+                  <div>• Recommended: <strong class="text-emerald-600 dark:text-emerald-400">Daily warm-up</strong></div>
+                </div>
+              </div>
+              <button onclick="startMock('quick')" class="mt-6 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs py-3 rounded-xl shadow-sm transition">
+                Launch Speed Drill &rarr;
+              </button>
+            </div>
+
+            <!-- Subject-Wise Drill -->
+            <div class="bg-white dark:bg-[#131d31] border border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50 p-6 rounded-2xl flex flex-col justify-between transition group shadow-sm">
+              <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] uppercase font-bold tracking-wider bg-blue-50 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30 px-2.5 py-1 rounded-full">Topic Focus</span>
+                  <span class="text-xs font-mono text-slate-500 dark:text-slate-400"><i class="fa-regular fa-clock"></i> 45 Mins</span>
+                </div>
+                <h4 class="font-bold text-lg text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">Topic-Specific Drill</h4>
+                <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Pick a specific syllabus domain to fortify weak areas and ensure chapter-wise mastery.
+                </p>
+                <div class="pt-2">
+                  <label class="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Select Topic:</label>
+                  <select id="mock-subject-picker" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs rounded-xl p-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-amber-500">
+                    <option value="IBC">Insolvency & Bankruptcy Code (IBC)</option>
+                    <option value="Rules & Regulations">IBBI Rules & Regulations</option>
+                    <option value="Business Laws">Business Laws (Companies Act, Contracts)</option>
+                    <option value="General Laws">General Laws (SARFAESI, RDDBFI, SFIO)</option>
+                    <option value="Finance & Accounts">Finance & Accounts, Valuation</option>
+                    <option value="General Awareness">General Awareness & Ecosystem</option>
+                  </select>
+                </div>
+              </div>
+              <button onclick="startSubjectMock()" class="mt-6 w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs py-3 rounded-xl shadow-sm transition">
+                Launch Topic Drill &rarr;
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ACTIVE EXAM ARENA -->
+        <div id="mock-active-arena" class="hidden space-y-4">
+          <div class="bg-white dark:bg-[#131d31] border border-slate-200 dark:border-slate-800 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4 sticky top-20 z-30 shadow-sm">
+            <div class="flex items-center gap-3">
+              <span class="text-lg">📝</span>
+              <div>
+                <h4 id="arena-mock-heading" class="font-bold text-xs sm:text-sm text-slate-900 dark:text-white uppercase tracking-wider">Examination in Progress</h4>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Question <span id="arena-q-index" class="font-bold text-slate-900 dark:text-white">1</span> of <span id="arena-q-count">25</span></p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <div id="arena-timer-box" class="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 px-3.5 py-2 rounded-xl flex items-center gap-2 font-mono text-sm font-bold text-amber-600 dark:text-amber-400 shadow-inner">
+                <i class="fa-regular fa-clock"></i>
+                <span id="arena-timer-digits">00:00</span>
+              </div>
+
+              <button onclick="confirmSubmitExam()" class="bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5">
+                <i class="fa-solid fa-flag-checkered"></i> <span>Submit Paper</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            
+            <!-- QUESTION CARD -->
+            <div class="lg:col-span-3 bg-white dark:bg-[#131d31] border border-slate-200 dark:border-slate-800 p-6 sm:p-8 rounded-2xl space-y-6 flex flex-col justify-between shadow-sm">
+              <div class="space-y-4">
+                <div class="flex items-center justify-between flex-wrap gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+                  <div class="flex items-center gap-2">
+                    <span id="arena-q-topic-tag" class="text-xs bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-semibold px-3 py-1 rounded-full border border-amber-200 dark:border-amber-500/30">IBC</span>
+                    <span id="arena-q-diff-tag" class="text-[11px] text-slate-500 dark:text-slate-400 font-mono">Standard Level</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span id="arena-q-marks-tag" class="text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-500/30">+1.00 Mark</span>
+                    <span class="text-xs font-semibold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 px-2.5 py-1 rounded-lg border border-rose-200 dark:border-rose-500/30">-0.25 Penalty</span>
+                  </div>
+                </div>
+
+                <p id="arena-question-text" class="text-base sm:text-lg text-slate-900 dark:text-white font-medium leading-relaxed">
+                  Loading question text...
+                </p>
+
+                <div id="arena-options-container" class="space-y-3 pt-2">
+                  <!-- Populated via JS -->
+                </div>
+              </div>
+
+              <div class="pt-6 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                  <button onclick="prevArenaQuestion()" id="arena-prev-btn" class="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2.5 rounded-xl text-xs font-semibold transition disabled:opacity-40 flex items-center gap-1.5 border border-slate-200 dark:border-transparent">
+                    <i class="fa-solid fa-chevron-left text-[10px]"></i> <span>Previous</span>
+                  </button>
+                  <button onclick="clearCurrentSelection()" class="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-3.5 py-2.5 rounded-xl text-xs font-medium border border-slate-200 dark:border-slate-700 transition">
+                    Clear Choice
+                  </button>
+                  <button onclick="toggleMarkReview()" id="arena-review-btn" class="bg-purple-50 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700 px-3.5 py-2.5 rounded-xl text-xs font-medium transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-bookmark text-[10px]"></i> <span id="arena-review-label">Mark for Review</span>
+                  </button>
+                </div>
+
+                <button onclick="nextArenaQuestion()" id="arena-next-btn" class="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition flex items-center gap-2">
+                  <span>Save & Next</span> <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- PALETTE -->
+            <div class="bg-white dark:bg-[#131d31] border border-slate-200 dark:border-slate-800 p-5 rounded-2xl space-y-4 shadow-sm">
+              <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                <h5 class="font-bold text-xs uppercase tracking-wider text-slate-700 dark:text-slate-300">Question Palette</h5>
+                <span id="arena-palette-summary" class="text-[11px] text-slate-500 dark:text-slate-400 font-mono">0 Answered</span>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 text-[10px] text-slate-600 dark:text-slate-400 pb-2 border-b border-slate-200 dark:border-slate-800">
+                <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-emerald-600 inline-block"></span> Answered</div>
+                <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-purple-600 inline-block"></span> Review</div>
+                <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 inline-block"></span> Unattempted</div>
+                <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded border-2 border-amber-500 inline-block"></span> Current</div>
+              </div>
+
+              <div id="arena-palette-grid" class="grid grid-cols-5 gap-2 max-h-72 overflow-y-auto pr-1 scrollbar-thin">
+                <!-- Buttons rendered via JS -->
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- SCORECARD -->
+        <div id="mock-result-screen" class="hidden space-y-8">
+          <div class="bg-white dark:bg-[#131d31] border border-slate-200 dark:border-slate-800 p-8 rounded-3xl text-center max-w-2xl mx-auto shadow-sm">
+            <div class="w-20 h-20 mx-auto rounded-2xl bg-amber-50 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30 flex items-center justify-center text-3xl mb-4 shadow-sm">
+              🏆
+            </div>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">Examination Scorecard</h2>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">Limited Insolvency Examination Simulation (IBBI Standard)</p>
+
+            <div class="grid grid-cols-3 gap-4 mt-6 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl">
+              <div>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Total Marks</p>
+                <h3 id="res-marks" class="text-2xl sm:text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1 font-mono">0 / 100</h3>
+              </div>
+              <div>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Percentage</p>
+                <h3 id="res-percent" class="text-2xl sm:text-3xl font-extrabold text-amber-600 dark:text-amber-400 mt-1 font-mono">0%</h3>
+              </div>
+              <div>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Outcome</p>
+                <h3 id="res-qualify-badge" class="text-base sm:text-lg font-bold text-amber-600 dark:text-amber-400 mt-1.5">Assessing</h3>
+              </div>
+            </div>
+
+            <!-- Breakdown Pills -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4 text-xs">
+              <div class="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-center">
+                <span class="block text-[10px] uppercase text-slate-500 dark:text-slate-400 font-semibold tracking-wider">Correct</span>
+                <strong id="res-correct-count" class="text-base font-bold font-mono">0</strong>
+                <span id="res-positive-sub" class="block text-[10px] font-mono mt-0.5 text-emerald-600 dark:text-emerald-400">+0.00 M</span>
+              </div>
+              <div class="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-center">
+                <span class="block text-[10px] uppercase text-slate-500 dark:text-slate-400 font-semibold tracking-wider">Incorrect</span>
+                <strong id="res-incorrect-count" class="text-base font-bold font-mono">0</strong>
+                <span id="res-negative-sub" class="block text-[10px] font-mono mt-0.5 text-rose-600 dark:text-rose-400">-0.00 M</span>
+              </div>
+              <div class="p-3 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-center">
+                <span class="block text-[10px] uppercase text-slate-500 dark:text-slate-400 font-semibold tracking-wider">Skipped</span>
+                <strong id="res-unattempted-count" class="text-base font-bold font-mono">0</strong>
+                <span class="block text-[10px] font-mono mt-0.5 text-slate-500">0.00 M</span>
+              </div>
+              <div class="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-center">
+                <span class="block text-[10px] uppercase text-slate-500 dark:text-slate-400 font-semibold tracking-wider">Cutoff Pass</span>
+                <strong class="text-base font-bold font-mono text-amber-700 dark:text-amber-400">60.00</strong>
+                <span class="block text-[10px] font-mono mt-0.5 text-slate-500">60% Required</span>
+              </div>
+            </div>
+
+            <!-- Dynamic Faculty Diagnostic Feedback -->
+            <div id="res-feedback-card" class="mt-5 p-4 rounded-2xl border text-left text-xs space-y-1.5 bg-slate-50 dark:bg-slate-950/60 border-slate-200 dark:border-slate-800">
+              <div class="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-graduation-cap text-amber-500"></i> Faculty Evaluation & Performance Analysis
+              </div>
+              <p id="res-feedback-text" class="text-slate-600 dark:text-slate-300 leading-relaxed"></p>
+            </div>
+
+            <div class="mt-6 flex flex-wrap justify-center gap-3">
+              <button onclick="startFreshMockExam()" class="bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs px-6 py-3 rounded-xl shadow-sm transition flex items-center gap-2">
+                <i class="fa-solid fa-rotate-right text-xs"></i> <span>Take Another Examination (New Questions)</span>
+              </button>
+              <button onclick="resetMockArena()" class="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 font-semibold text-xs px-5 py-3 rounded-xl transition">
+                Change Exam Mode
+              </button>
+              <button onclick="switchTab('weakareas')" class="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 font-semibold text-xs px-5 py-3 rounded-xl transition">
+                View Weak Areas
+              </button>
+            </div>
+          </div>
+
+          <!-- QUESTION REVIEW -->
+          <div class="bg-white dark:bg-[#131d31] border border-slate-200 dark:border-slate-800 p-6 rounded-2xl space-y-6 shadow-sm">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+              <div>
+                <h3 class="font-bold text-base text-slate-900 dark:text-white">Statutory Rationale & Question-by-Question Breakdown</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Compare your selected options against official answer keys and statutory provisions.</p>
+              </div>
+              <div class="flex items-center gap-2 text-xs flex-wrap">
+                <button onclick="filterReviewList('all')" id="rf-all" class="px-3 py-1.5 rounded-lg bg-amber-500 text-white font-semibold">All Questions</button>
+                <button onclick="filterReviewList('incorrect')" id="rf-inc" class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-semibold border border-slate-200 dark:border-transparent">Incorrect Only</button>
+                <button onclick="filterReviewList('correct')" id="rf-cor" class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-semibold border border-slate-200 dark:border-transparent">Correct Only</button>
+                <button onclick="filterReviewList('unattempted')" id="rf-unatt" class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-semibold border border-slate-200 dark:border-transparent">Unattempted Only</button>
+              </div>
+            </div>
+
+            <div id="res-review-cards-list" class="space-y-5">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ────────────────── 5. CASE LAWS ────────────────── -->
+      <section id="pane-caselaws" class="tab-pane space-y-6">
+        <div class="bg-white dark:bg-[#131d31] border border-slate-200/80 dark:border-slate-800 p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+          <div>
+            <h3 class="text-xl font-extrabold text-slate-900 dark:text-white">Landmark Judicial Precedents</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Supreme Court of India & NCLAT rulings establishing core principles tested in examinations.
+            </p>
+          </div>
+          <div class="w-full md:w-80">
+            <div class="relative">
+              <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+              <input type="text" id="case-law-search-box" oninput="filterCaseLawsLive()" placeholder="Search by case name, citation, or rule..." class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white rounded-xl pl-9 pr-4 py-2.5 focus:outline-none focus:border-amber-500 transition placeholder-slate-400">
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+          <button onclick="setCaseLawFilter('all')" id="clf-all" class="px-3.5 py-1.5 rounded-xl bg-amber-500 text-white font-semibold">All Judgments (16)</button>
+          <button onclick="setCaseLawFilter('Supreme Court')" id="clf-sc" class="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700">Supreme Court</button>
+          <button onclick="setCaseLawFilter('NCLAT')" id="clf-nclat" class="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700">NCLAT</button>
+          <button onclick="setCaseLawFilter('Section 7')" id="clf-sec7" class="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700">CIRP Initiation</button>
+          <button onclick="setCaseLawFilter('Moratorium')" id="clf-mor" class="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700">Moratorium Precedents</button>
+        </div>
+
+        <div id="case-laws-grid-container" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <!-- Rendered via JS -->
+        </div>
+      </section>
+
+      <!-- ────────────────── 6. CASE STUDIES (70 MARKS) ────────────────── -->
+      <section id="pane-casestudies" class="tab-pane space-y-6">
+        <div class="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-slate-900 border border-amber-200 dark:border-amber-500/30 p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+          <div class="space-y-1 max-w-2xl">
+            <div class="inline-flex items-center gap-2 text-[10px] uppercase font-bold tracking-wider text-amber-800 dark:text-amber-400 bg-amber-100 dark:bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-300 dark:border-amber-500/20">
+              Official Examination Weightage: 70 Marks
+            </div>
+            <h3 class="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">Practical Case Studies Module</h3>
+            <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              Multi-question factual scenarios testing resolution plans, liquidation payouts, avoidance transactions (Sections 43-51), and personal guarantors. Each question carries <strong class="text-amber-700 dark:text-amber-400">4 marks</strong>.
+            </p>
+          </div>
+        </div>
+
+        <div id="case-studies-cards-grid" class="grid grid-cols-1 gap-4">
+          <!-- Rendered via JS -->
+        </div>
+
+        <!-- SPLIT SOLVER -->
+        <div id="cs-solver-view" class="hidden space-y-4">
+          <div class="bg-white dark:bg-[#131d31] border border-slate-200 dark:border-slate-800 p-4 rounded-2xl flex items-center justify-between shadow-sm">
+            <div class="flex items-center gap-3">
+              <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30" id="cs-active-topic">CIRP</span>
+              <h4 id="cs-active-title" class="font-bold text-sm sm:text-base text-slate-900 dark:text-white">Scenario Title</h4>
+            </div>
+            <button onclick="closeCaseStudySolver()" class="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 border border-slate-200 dark:border-transparent">
+              <i class="fa-solid fa-arrow-left"></i> <span>Return to Case Studies</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div class="lg:col-span-5 bg-white dark:bg-[#131d31] border border-slate-200 dark:border-slate-800 p-6 rounded-2xl space-y-4 sticky top-20 max-h-[75vh] overflow-y-auto scrollbar-thin shadow-sm">
+              <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                <h5 class="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                  <i class="fa-solid fa-file-lines"></i> Factual Scenario
+                </h5>
+                <span class="text-[10px] text-slate-500 dark:text-slate-400 font-mono">Reference Text</span>
+              </div>
+              <p id="cs-active-scenario" class="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-line font-serif">
+                Loading scenario text...
+              </p>
+            </div>
+
+            <div class="lg:col-span-7 space-y-4" id="cs-active-questions-list">
+              <!-- Questions rendered via JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ────────────────── 7. WEAK AREAS ────────────────── -->
+      <section id="pane-weakareas" class="tab-pane space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white dark:bg-[#131d31] border border-slate-200/80 dark:border-slate-800 p-6 rounded-2xl space-y-4 shadow-sm">
+            <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h3 class="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-crosshairs text-rose-500"></i> Performance Diagnostic Matrix
+              </h3>
+              <span class="text-[11px] text-slate-500 dark:text-slate-400 font-mono">Threshold: &lt; 60%</span>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Classifies subtopics by error type (provision recall, case law principle, or numerical calculation).</p>
+            <div id="weak-matrix-container" class="space-y-3">
+              <p class="text-xs text-slate-400 dark:text-slate-500 italic text-center py-6">No weaknesses identified yet. Complete an examination to generate diagnostics.</p>
+            </div>
+          </div>
+
+          <div class="bg-white dark:bg-[#131d31] border border-slate-200/80 dark:border-slate-800 p-6 rounded-2xl space-y-4 shadow-sm">
+            <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h3 class="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-lightbulb text-amber-500"></i> Faculty Advisory Guidance
+              </h3>
+              <button onclick="loadWeakAreasAndRecs()" class="text-xs text-blue-600 dark:text-blue-400 hover:underline transition flex items-center gap-1">
+                <i class="fa-solid fa-rotate text-[10px]"></i> <span>Refresh</span>
+              </button>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Targeted study strategies tailored to your error patterns.</p>
+            <div id="ai-recs-container" class="space-y-3">
+              <!-- Populated via JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- DRILL GENERATOR -->
+        <div class="bg-white dark:bg-[#131d31] border border-slate-200/80 dark:border-slate-800 p-6 rounded-2xl space-y-4 shadow-sm">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+            <div>
+              <h3 class="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-fire text-amber-500"></i> Target Drill on Weak Concepts
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Retrieves questions specifically from your sub-60% scoring topics.</p>
+            </div>
+            <button onclick="generateWeakAreaDrill()" class="bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs px-5 py-2.5 rounded-xl shadow-sm transition flex items-center gap-2">
+              <i class="fa-solid fa-arrows-rotate text-xs"></i> <span>Generate Practice Drill</span>
+            </button>
+          </div>
+
+          <div id="weak-drill-questions-list" class="space-y-4 pt-2">
+            <div class="text-center py-10 text-slate-400 dark:text-slate-500 text-xs">
+              Click <strong>"Generate Practice Drill"</strong> to solve targeted questions for your weakest syllabus areas.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ────────────────── 8. PROGRESS ────────────────── -->
+      <section id="pane-progress" class="tab-pane space-y-6">
+        <div class="bg-white dark:bg-[#131d31] border border-slate-200/80 dark:border-slate-800 p-6 rounded-2xl space-y-4 shadow-sm">
+          <h3 class="font-extrabold text-xl text-slate-900 dark:text-white">Study Milestone Progress</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Review completed chapters and track your active preparation schedule.</p>
+          
+          <div id="progress-tab-content" class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ────────────────── 9. HISTORY ────────────────── -->
+      <section id="pane-history" class="tab-pane space-y-6">
+        <div class="bg-white dark:bg-[#131d31] border border-slate-200/80 dark:border-slate-800 p-6 rounded-2xl flex items-center justify-between shadow-sm">
+          <div>
+            <h3 class="text-xl font-extrabold text-slate-900 dark:text-white">Candidate Attempt Log</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Audit log of all answered questions, time taken, and mark awards.</p>
+          </div>
+          <button onclick="loadHistoryData()" class="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition flex items-center gap-1.5">
+            <i class="fa-solid fa-arrows-rotate text-[11px]"></i> <span>Refresh Log</span>
+          </button>
+        </div>
+
+        <div class="bg-white dark:bg-[#131d31] border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-700 dark:text-slate-300">
+              <thead class="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px] font-semibold">
+                <tr>
+                  <th class="p-4">Syllabus Topic & Question Snippet</th>
+                  <th class="p-4">Selected Option</th>
+                  <th class="p-4">Result</th>
+                  <th class="p-4">Marks Net</th>
+                  <th class="p-4">Error Classification</th>
+                </tr>
+              </thead>
+              <tbody id="history-log-table-body" class="divide-y divide-slate-200 dark:divide-slate-800/60">
+                <tr><td colspan="5" class="p-6 text-center text-slate-400 dark:text-slate-500">No attempts logged yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- APPLICATION JAVASCRIPT -->
+  <script>
+    // ─── THEME HANDLING (LIGHT / DARK) ──────────────────────────────────────
+    function initTheme() {
+      const saved = localStorage.getItem('ibbi_exam_theme');
+      if (saved === 'dark') {
+        setThemeDark();
+      } else {
+        setThemeLight(); // Default to light mode matching screenshot!
+      }
+    }
+
+    function toggleThemeMode() {
+      const isDark = document.documentElement.classList.contains('dark');
+      if (isDark) {
+        setThemeLight();
+        localStorage.setItem('ibbi_exam_theme', 'light');
+        showToast('Switched to Light Mode', 'info');
+      } else {
+        setThemeDark();
+        localStorage.setItem('ibbi_exam_theme', 'dark');
+        showToast('Switched to Dark Mode', 'info');
+      }
+    }
+
+    function setThemeDark() {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+      const icon = document.getElementById('theme-toggle-icon');
+      if (icon) icon.className = 'fa-solid fa-moon text-amber-400';
+    }
+
+    function setThemeLight() {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+      const icon = document.getElementById('theme-toggle-icon');
+      if (icon) icon.className = 'fa-solid fa-sun text-amber-600';
+    }
+
+    // ─── STATE STORE ────────────────────────────────────────────────────────
+    let currentActiveTab = 'dashboard';
+    let allCaseLawsCache = [];
+    let currentCaseLawFilter = 'all';
+
+    // Mock session state
+    let activeMockSession = null;
+    let activeMockQuestions = [];
+    let activeMockIndex = 0;
+    let activeMockAnswers = {};
+    let activeMockMarkedForReview = new Set();
+    let activeMockTimerTimer = null;
+    let activeMockRemainingSeconds = 0;
+    let currentReviewFilter = 'all';
+    let lastExamResultDetails = [];
+
+    // ─── INITIALIZATION ─────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      initTheme();
+      loadDashboardData();
+      loadChatHistoryData();
+      loadCaseLawsData();
+      loadCaseStudiesData();
+      loadWeakAreasAndRecs();
+      loadSyllabusData();
+
+      document.addEventListener('keydown', handleGlobalKeydown);
+    });
+
+    // ─── TOAST NOTIFIER ─────────────────────────────────────────────────────
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      
+      const colors = {
+        success: 'bg-emerald-900/90 text-emerald-100 border-emerald-700',
+        error: 'bg-rose-900/90 text-rose-100 border-rose-700',
+        info: 'bg-slate-900/90 text-slate-100 border-slate-700',
+        warning: 'bg-amber-900/90 text-amber-100 border-amber-700'
+      };
+
+      const icons = {
+        success: 'fa-circle-check text-emerald-400',
+        error: 'fa-circle-xmark text-rose-400',
+        info: 'fa-circle-info text-amber-400',
+        warning: 'fa-triangle-exclamation text-amber-400'
+      };
+
+      toast.className = `flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-xl text-xs transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto backdrop-blur-md ${colors[type] || colors.info}`;
+      toast.innerHTML = `<i class="fa-solid ${icons[type] || icons.info}"></i> <span>${message}</span>`;
+      
+      container.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.remove('translate-y-2', 'opacity-0'));
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-x-4');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    function toggleShortcutsModal() {
+      document.getElementById('shortcuts-modal').classList.toggle('hidden');
+    }
+
+    // ─── TAB NAVIGATION ─────────────────────────────────────────────────────
+    const tabTitles = {
+      dashboard: 'Dashboard',
+      chat: 'AI Tutor (Faculty Desk)',
+      syllabus: 'Syllabus',
+      mock: 'Mock Test',
+      caselaws: 'Case Laws',
+      casestudies: 'Case Studies',
+      weakareas: 'Weak Areas',
+      progress: 'Progress',
+      history: 'History'
+    };
+
+    function switchTab(tabId) {
+      currentActiveTab = tabId;
+      document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.sidebar-item').forEach(btn => btn.classList.remove('active'));
+
+      const pane = document.getElementById('pane-' + tabId);
+      if (pane) pane.classList.add('active');
+
+      const btn = document.querySelector(`.sidebar-item[data-tab="${tabId}"]`);
+      if (btn) btn.classList.add('active');
+
+      const titleEl = document.getElementById('topbar-title');
+      if (titleEl) titleEl.innerText = tabTitles[tabId] || 'Dashboard';
+
+      if (tabId === 'dashboard') loadDashboardData();
+      if (tabId === 'history') loadHistoryData();
+      if (tabId === 'weakareas') loadWeakAreasAndRecs();
+      if (tabId === 'syllabus' || tabId === 'progress') loadSyllabusData();
+    }
+
+    // ─── 1. DASHBOARD DATA & EXACT SCREENSHOT REPLICATION ───────────────────
+    async function loadDashboardData() {
+      try {
+        const res = await fetch('/api/dashboard');
+        const data = await res.json();
+
+        // 4 TOP CARDS (Exact Match to Screenshot)
+        document.getElementById('stat-q-attempted').innerText = data.total_attempts || 0;
+        document.getElementById('stat-accuracy').innerText = `${data.accuracy || 0}%`;
+        document.getElementById('stat-correct-subtext').innerText = `${data.correct_attempts || 0} correct`;
+        document.getElementById('stat-mocks-done').innerText = data.mocks_completed || 0;
+        document.getElementById('stat-days-num').innerText = data.days_to_exam || 0;
+        document.getElementById('top-days-to-exam').innerText = `${data.days_to_exam || 0} days to exam`;
+
+        const readiness = data.readiness || 'Significant Gaps';
+        const badgeEl = document.getElementById('stat-readiness-badge');
+        badgeEl.innerText = readiness;
+        if (readiness === 'Exam Ready') {
+          badgeEl.className = 'inline-block px-3.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800';
+        } else if (readiness === 'Almost Ready') {
+          badgeEl.className = 'inline-block px-3.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800';
+        } else {
+          badgeEl.className = 'inline-block px-3.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-900';
+        }
+
+        // LEFT CARD: Topic Performance Horizontal Bars (Exact Screenshot Match)
+        renderTopicPerformanceBars(data.topic_performance || []);
+
+        // RIGHT CARD: Weak Areas (< 60%) (Exact Screenshot Match)
+        renderWeakAreasList(data.weak_areas || []);
+
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderTopicPerformanceBars(topics) {
+      const container = document.getElementById('topic-perf-list');
+      
+      // Default core syllabus topics if not attempted yet
+      const syllabusDefaults = [
+        'Business Laws',
+        'General Laws',
+        'IBC',
+        'Case Studies',
+        'Rules & Regulations',
+        'Finance & Accounts'
+      ];
+
+      const topicMap = {};
+      topics.forEach(t => topicMap[t.topic] = t.accuracy);
+
+      const items = syllabusDefaults.map(name => ({
+        name,
+        accuracy: topicMap[name] !== undefined ? topicMap[name] : 0
+      }));
+
+      container.innerHTML = items.map(t => {
+        const acc = parseFloat(t.accuracy);
+        let barColor = 'bg-rose-500'; // red
+        let dotColor = 'bg-rose-500';
+        if (acc >= 75) {
+          barColor = 'bg-emerald-500'; // green
+          dotColor = 'bg-emerald-500';
+        } else if (acc >= 40) {
+          barColor = 'bg-amber-500'; // orange
+          dotColor = 'bg-amber-500';
+        }
+
+        return `
+          <div class="flex items-center justify-between gap-4 text-xs">
+            <span class="w-36 text-slate-700 dark:text-slate-300 font-medium truncate">${t.name}</span>
+            <div class="flex-1 bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden flex items-center">
+              ${acc === 0 ? `
+                <span class="w-2 h-2 rounded-full ${dotColor} ml-0.5"></span>
+              ` : `
+                <div class="${barColor} h-full rounded-full transition-all duration-500" style="width: ${acc}%"></div>
+              `}
+            </div>
+            <span class="w-12 text-right text-xs font-semibold text-slate-600 dark:text-slate-400 font-mono">${acc}%</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderWeakAreasList(weaks) {
+      const container = document.getElementById('weak-areas-list');
+      if (!weaks || weaks.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 dark:text-slate-500 italic text-center py-8">Complete questions to diagnose weak areas.</p>';
+        return;
+      }
+
+      container.innerHTML = weaks.map(w => `
+        <div class="flex items-center justify-between py-3">
+          <div>
+            <div class="text-xs font-bold text-slate-800 dark:text-slate-200">${w.topic}</div>
+            <div class="text-[11px] text-slate-400 dark:text-slate-500">${w.subtopic || 'General'}</div>
+            <span class="inline-block mt-1 text-[10px] font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-900">
+              ${w.weakness_type || 'conceptual'}
+            </span>
+          </div>
+          <div class="text-right">
+            <div class="text-xs font-bold text-rose-600 dark:text-rose-400 font-mono">${w.score}%</div>
+            <div class="text-[10px] text-slate-400 dark:text-slate-500 font-mono">${w.attempts} attempts</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // ─── 2. AI TUTOR (FACULTY DESK) ─────────────────────────────────────────
+    async function loadChatHistoryData() {
+      try {
+        const res = await fetch('/api/chat/history');
+        const history = await res.json();
+        const container = document.getElementById('chat-messages-container');
+        if (history && history.length > 0) {
+          container.innerHTML = '';
+          history.forEach(m => renderChatMessageBubble(m.role, m.content));
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderChatMessageBubble(role, content) {
+      const container = document.getElementById('chat-messages-container');
+      const isUser = role === 'user';
+      const wrapper = document.createElement('div');
+      wrapper.className = `flex items-start gap-3 max-w-3xl ${isUser ? 'ml-auto flex-row-reverse' : ''}`;
+
+      const avatar = isUser ? 
+        `<div class="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 shadow-sm">You</div>` :
+        `<div class="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 shadow-sm">AI</div>`;
+
+      const bubbleClass = isUser ?
+        'bg-blue-600 text-white rounded-tr-none shadow-sm' :
+        'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-tl-none prose-legal shadow-sm';
+
+      const renderedHtml = isUser ? 
+        `<p class="whitespace-pre-wrap leading-relaxed">${escapeHtml(content)}</p>` :
+        marked.parse(content);
+
+      wrapper.innerHTML = `
+        ${avatar}
+        <div class="relative group p-4 rounded-2xl border text-xs sm:text-sm shadow-sm leading-relaxed ${bubbleClass}">
+          ${renderedHtml}
+          ${!isUser ? `
+            <button onclick="copyToClipboard(this)" data-content="${encodeURIComponent(content)}" class="opacity-0 group-hover:opacity-100 transition absolute top-2 right-2 text-[10px] bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-2 py-1 rounded text-slate-700 dark:text-slate-300">
+              <i class="fa-regular fa-copy"></i> Copy
+            </button>
+          ` : ''}
+        </div>
+      `;
+
+      container.appendChild(wrapper);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    async function handleChatSubmitEvent(e) {
+      e.preventDefault();
+      const input = document.getElementById('chat-text-input');
+      const msg = input.value.trim();
+      if (!msg) return;
+
+      sendChatMessage(msg);
+      input.value = '';
+    }
+
+    async function sendChatMessage(msg) {
+      renderChatMessageBubble('user', msg);
+
+      const container = document.getElementById('chat-messages-container');
+      const loader = document.createElement('div');
+      loader.id = 'chat-typing-loader';
+      loader.className = 'flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 italic pl-11';
+      loader.innerHTML = '<i class="fa-solid fa-circle-notch animate-spin text-amber-500"></i> <span>Consulting Insolvency Code, Regulations & Precedents...</span>';
+      container.appendChild(loader);
+      container.scrollTop = container.scrollHeight;
+
+      const submitBtn = document.getElementById('chat-submit-btn');
+      submitBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg })
+        });
+        const data = await res.json();
+        loader.remove();
+        renderChatMessageBubble('assistant', data.reply || 'No response returned.');
+      } catch (err) {
+        loader.remove();
+        renderChatMessageBubble('assistant', 'Error connecting to faculty desk. Please try again.');
+      } finally {
+        submitBtn.disabled = false;
+      }
+    }
+
+    async function clearChatHistory() {
+      if (!confirm('Clear all conversation history?')) return;
+      await fetch('/api/chat/history', { method: 'DELETE' });
+      document.getElementById('chat-messages-container').innerHTML = '';
+      showToast('Conversation cleared', 'info');
+    }
+
+    function copyToClipboard(btn) {
+      const text = decodeURIComponent(btn.getAttribute('data-content'));
+      navigator.clipboard.writeText(text);
+      showToast('Copied to clipboard', 'success');
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // ─── 3. MOCK EXAM ───────────────────────────────────────────────────────
+    async function startMock(type) {
+      try {
+        const res = await fetch('/api/mock/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type })
+        });
+        const data = await res.json();
+        if (data.error) return showToast(data.error, 'error');
+
+        setupMockArenaSession(data);
+      } catch (err) {
+        showToast('Failed to start mock exam', 'error');
+      }
+    }
+
+    async function startSubjectMock() {
+      const topic = document.getElementById('mock-subject-picker').value;
+      try {
+        const res = await fetch('/api/mock/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'topic', topic, num_questions: 15 })
+        });
+        const data = await res.json();
+        if (data.error) return showToast(data.error, 'error');
+
+        setupMockArenaSession(data);
+      } catch (err) {
+        showToast('Failed to start topic drill', 'error');
+      }
+    }
+
+    function setupMockArenaSession(data) {
+      activeMockSession = data;
+      activeMockQuestions = data.questions || [];
+      activeMockIndex = 0;
+      activeMockAnswers = {};
+      activeMockMarkedForReview.clear();
+
+      document.getElementById('mock-launcher-screen').classList.add('hidden');
+      document.getElementById('mock-result-screen').classList.add('hidden');
+      document.getElementById('mock-active-arena').classList.remove('hidden');
+
+      document.getElementById('arena-q-count').innerText = activeMockQuestions.length;
+      document.getElementById('arena-mock-heading').innerText = `${data.type.toUpperCase()} EXAMINATION (${data.max_marks} MARKS)`;
+
+      renderActiveArenaQuestion();
+      renderArenaPalette();
+      startArenaCountdown(data.duration || 1800);
+      showToast(`Examination started (${Math.round((data.duration||1800)/60)} mins)`, 'info');
+    }
+
+    function renderActiveArenaQuestion() {
+      if (!activeMockQuestions.length) return;
+      const q = activeMockQuestions[activeMockIndex];
+
+      document.getElementById('arena-q-index').innerText = activeMockIndex + 1;
+      document.getElementById('arena-q-topic-tag').innerText = `${q.topic} ${q.subtopic ? '— ' + q.subtopic : ''}`;
+      document.getElementById('arena-q-marks-tag').innerText = `+${q.marks || 1}.00 Mark`;
+      document.getElementById('arena-question-text').innerText = q.question;
+
+      const container = document.getElementById('arena-options-container');
+      const opts = [
+        { k: 'A', text: q.option_a },
+        { k: 'B', text: q.option_b },
+        { k: 'C', text: q.option_c },
+        { k: 'D', text: q.option_d }
+      ].filter(o => o.text);
+
+      const selected = activeMockAnswers[q.id];
+
+      container.innerHTML = opts.map(opt => `
+        <label class="flex items-start gap-3.5 p-4 rounded-xl border transition cursor-pointer select-none ${
+          selected === opt.k ?
+          'border-amber-500 bg-amber-50/60 dark:bg-amber-500/10 shadow-sm' :
+          'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 hover:border-slate-300 dark:hover:border-slate-700'
+        }">
+          <input type="radio" name="arena_choice" value="${opt.k}" ${selected === opt.k ? 'checked' : ''} onchange="selectArenaAnswer(${q.id}, '${opt.k}')" class="mt-0.5 text-amber-500 focus:ring-0">
+          <div class="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed">
+            <strong class="text-amber-600 dark:text-amber-400 mr-1.5 font-mono">${opt.k}.</strong> ${opt.text}
+          </div>
+        </label>
+      `).join('');
+
+      document.getElementById('arena-prev-btn').disabled = activeMockIndex === 0;
+      document.getElementById('arena-next-btn').innerHTML = activeMockIndex === activeMockQuestions.length - 1 ? 
+        `<span>Submit Paper</span> <i class="fa-solid fa-flag-checkered text-[10px]"></i>` : 
+        `<span>Save & Next</span> <i class="fa-solid fa-chevron-right text-[10px]"></i>`;
+
+      const isReview = activeMockMarkedForReview.has(q.id);
+      document.getElementById('arena-review-label').innerText = isReview ? 'Marked for Review' : 'Mark for Review';
+
+      renderArenaPalette();
+    }
+
+    async function selectArenaAnswer(qId, choice) {
+      activeMockAnswers[qId] = choice;
+      renderArenaPalette();
+
+      try {
+        await fetch(`/api/mock/${activeMockSession.mock_id}/answer`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question_id: qId, selected_answer: choice })
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function clearCurrentSelection() {
+      const q = activeMockQuestions[activeMockIndex];
+      delete activeMockAnswers[q.id];
+      renderActiveArenaQuestion();
+      showToast('Selection cleared', 'info');
+    }
+
+    function toggleMarkReview() {
+      const q = activeMockQuestions[activeMockIndex];
+      if (activeMockMarkedForReview.has(q.id)) {
+        activeMockMarkedForReview.delete(q.id);
+      } else {
+        activeMockMarkedForReview.add(q.id);
+      }
+      renderActiveArenaQuestion();
+    }
+
+    function nextArenaQuestion() {
+      if (activeMockIndex < activeMockQuestions.length - 1) {
+        activeMockIndex++;
+        renderActiveArenaQuestion();
+      } else {
+        confirmSubmitExam();
+      }
+    }
+
+    function prevArenaQuestion() {
+      if (activeMockIndex > 0) {
+        activeMockIndex--;
+        renderActiveArenaQuestion();
+      }
+    }
+
+    function jumpToQuestion(idx) {
+      activeMockIndex = idx;
+      renderActiveArenaQuestion();
+    }
+
+    function renderArenaPalette() {
+      const grid = document.getElementById('arena-palette-grid');
+      let answeredCount = 0;
+
+      grid.innerHTML = activeMockQuestions.map((q, idx) => {
+        const isAnswered = !!activeMockAnswers[q.id];
+        const isReview = activeMockMarkedForReview.has(q.id);
+        const isCurrent = idx === activeMockIndex;
+
+        if (isAnswered) answeredCount++;
+
+        let statusClass = 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300';
+        if (isReview) statusClass = 'palette-review';
+        else if (isAnswered) statusClass = 'palette-answered';
+
+        if (isCurrent) statusClass += ' ring-2 ring-amber-500';
+
+        return `
+          <button onclick="jumpToQuestion(${idx})" class="h-9 w-full rounded-lg text-xs font-bold font-mono transition flex items-center justify-center border ${statusClass}">
+            ${idx + 1}
+          </button>
+        `;
+      }).join('');
+
+      document.getElementById('arena-palette-summary').innerText = `${answeredCount} / ${activeMockQuestions.length} Answered`;
+    }
+
+    function startArenaCountdown(durationSeconds) {
+      clearInterval(activeMockTimerTimer);
+      activeMockRemainingSeconds = durationSeconds;
+      const digits = document.getElementById('arena-timer-digits');
+      const box = document.getElementById('arena-timer-box');
+
+      activeMockTimerTimer = setInterval(() => {
+        if (activeMockRemainingSeconds <= 0) {
+          clearInterval(activeMockTimerTimer);
+          showToast('Time expired! Submitting paper...', 'warning');
+          submitExamPayload();
+          return;
+        }
+
+        activeMockRemainingSeconds--;
+        const m = Math.floor(activeMockRemainingSeconds / 60);
+        const s = activeMockRemainingSeconds % 60;
+        digits.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+
+        if (activeMockRemainingSeconds < 300) {
+          box.classList.add('text-rose-600', 'dark:text-rose-400', 'animate-pulse');
+        }
+      }, 1000);
+    }
+
+    function confirmSubmitExam() {
+      const answered = Object.keys(activeMockAnswers).length;
+      const total = activeMockQuestions.length;
+      const remaining = total - answered;
+
+      let msg = `You have answered ${answered} of ${total} questions.`;
+      if (remaining > 0) {
+        msg += ` ${remaining} question(s) remain unattempted.`;
+      }
+      msg += ' Submit paper now?';
+
+      if (confirm(msg)) {
+        submitExamPayload();
+      }
+    }
+
+    async function submitExamPayload() {
+      clearInterval(activeMockTimerTimer);
+
+      try {
+        const res = await fetch(`/api/mock/${activeMockSession.mock_id}/finish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const result = await res.json();
+        renderMockExamResults(result);
+      } catch (err) {
+        showToast('Error submitting paper', 'error');
+      }
+    }
+
+    function startFreshMockExam() {
+      startMock('full');
+    }
+
+    function renderMockExamResults(result) {
+      document.getElementById('mock-active-arena').classList.add('hidden');
+      document.getElementById('mock-result-screen').classList.remove('hidden');
+
+      const pct = parseFloat(result.percentage || 0);
+      const passed = pct >= 60;
+
+      document.getElementById('res-marks').innerText = `${result.total_marks} / ${result.max_marks}`;
+      document.getElementById('res-percent').innerText = `${result.percentage}%`;
+
+      const badge = document.getElementById('res-qualify-badge');
+      badge.innerText = passed ? 'QUALIFIED (≥60%)' : 'REVISION REQUIRED (<60%)';
+      badge.className = passed ? 'text-base sm:text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-1.5' : 'text-base sm:text-lg font-bold text-rose-600 dark:text-rose-400 mt-1.5';
+
+      document.getElementById('res-correct-count').innerText = result.correct_count || 0;
+      document.getElementById('res-positive-sub').innerText = `+${(result.positive_marks || 0).toFixed(2)} M`;
+      document.getElementById('res-incorrect-count').innerText = result.incorrect_count || 0;
+      document.getElementById('res-negative-sub').innerText = `-${(result.negative_marks || 0).toFixed(2)} M`;
+      document.getElementById('res-unattempted-count').innerText = result.unattempted_count || 0;
+
+      // Dynamic feedback
+      const fbText = document.getElementById('res-feedback-text');
+      if (passed) {
+        if (pct >= 75) {
+          fbText.innerHTML = `<strong>Distinction Level Performance:</strong> You scored <strong>${result.percentage}%</strong>, comfortably exceeding the 60.00 pass cutoff. Your accuracy across IBC provisions and case studies is solid. Maintain this standard by consolidating Pre-Pack timelines and liquidation waterfall calculations.`;
+        } else {
+          fbText.innerHTML = `<strong>Qualified:</strong> You scored <strong>${result.percentage}%</strong>, meeting the official IBBI passing threshold. However, negative penalties of <strong>-${result.negative_marks} marks</strong> were incurred on ${result.incorrect_count} incorrect answers. Be disciplined during the real examination: skip low-confidence questions to protect your score.`;
+        }
+      } else {
+        fbText.innerHTML = `<strong>Revision Required:</strong> You scored <strong>${result.percentage}%</strong> (cutoff is 60%). You lost <strong>-${result.negative_marks} marks</strong> due to incorrect responses. We recommend reviewing the high-yield Case Studies module and focusing on core Sections 7, 9, 14, 21, and 29A.`;
+      }
+
+      if (passed && window.confetti) {
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+      }
+
+      lastExamResultDetails = result.details || [];
+      renderReviewCards(lastExamResultDetails);
+
+      loadDashboardData();
+    }
+
+    function renderReviewCards(details) {
+      const container = document.getElementById('res-review-cards-list');
+      
+      let filtered = details;
+      if (currentReviewFilter === 'incorrect') filtered = details.filter(d => d.selected && !d.correct);
+      if (currentReviewFilter === 'correct') filtered = details.filter(d => d.selected && d.correct);
+      if (currentReviewFilter === 'unattempted') filtered = details.filter(d => !d.selected);
+
+      if (!filtered.length) {
+        container.innerHTML = '<p class="text-xs text-slate-500 dark:text-slate-400 text-center py-8 italic">No questions match this review filter.</p>';
+        return;
+      }
+
+      container.innerHTML = filtered.map((d, i) => {
+        const isAttempted = !!d.selected;
+        let cardBorderClass = 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131d31]';
+        let statusBadge = '';
+
+        if (!isAttempted) {
+          cardBorderClass = 'border-slate-300 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/40';
+          statusBadge = '<span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">Unattempted (0.00 Marks)</span>';
+        } else if (d.correct) {
+          cardBorderClass = 'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/30 dark:bg-emerald-950/20';
+          statusBadge = '<span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30">✓ Correct (+' + d.marks_earned + ' Marks)</span>';
+        } else {
+          cardBorderClass = 'border-rose-200 dark:border-rose-500/30 bg-rose-50/30 dark:bg-rose-950/20';
+          statusBadge = '<span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-500/30">✗ Incorrect (' + d.marks_earned + ' Marks)</span>';
+        }
+
+        return `
+          <div class="p-6 rounded-2xl border ${cardBorderClass} space-y-4 shadow-sm">
+            <div class="flex items-center justify-between text-xs border-b border-slate-200/80 dark:border-slate-800 pb-3">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-slate-900 dark:text-white">Question ${i + 1}</span>
+                <span class="text-slate-400 dark:text-slate-500">•</span>
+                <span class="font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 rounded">${d.topic}${d.subtopic ? ' — ' + d.subtopic : ''}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                ${statusBadge}
+              </div>
+            </div>
+
+            <p class="text-xs sm:text-sm text-slate-900 dark:text-white font-medium leading-relaxed">${escapeHtml(d.question)}</p>
+
+            <!-- All 4 Options rendered with candidate selection and official answer highlighted -->
+            <div class="space-y-2 pt-1">
+              ${['A', 'B', 'C', 'D'].map(key => {
+                const optText = d['option_' + key.toLowerCase()];
+                if (!optText) return '';
+                const isUserChoice = d.selected === key;
+                const isKey = d.correct_answer === key;
+
+                let rowClass = 'border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/50 text-slate-700 dark:text-slate-300';
+                let tag = '';
+
+                if (isUserChoice && isKey) {
+                  rowClass = 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-200 ring-1 ring-emerald-500 font-medium';
+                  tag = '<span class="ml-auto shrink-0 text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white px-2 py-0.5 rounded flex items-center gap-1"><i class="fa-solid fa-check"></i> Your Selection (Correct)</span>';
+                } else if (isUserChoice && !isKey) {
+                  rowClass = 'border-rose-500 bg-rose-50 dark:bg-rose-950/50 text-rose-900 dark:text-rose-200 ring-1 ring-rose-500 font-medium';
+                  tag = '<span class="ml-auto shrink-0 text-[10px] font-bold uppercase tracking-wider bg-rose-600 text-white px-2 py-0.5 rounded flex items-center gap-1"><i class="fa-solid fa-xmark"></i> Your Selection (Incorrect)</span>';
+                } else if (isKey) {
+                  rowClass = 'border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 font-medium';
+                  tag = '<span class="ml-auto shrink-0 text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white px-2 py-0.5 rounded flex items-center gap-1"><i class="fa-solid fa-key text-[9px]"></i> Official Correct Key</span>';
+                }
+
+                return `
+                  <div class="flex items-start sm:items-center justify-between p-3 rounded-xl border text-xs sm:text-sm transition gap-3 ${rowClass}">
+                    <div class="flex items-start gap-2.5">
+                      <span class="font-mono font-bold w-5 shrink-0 ${isKey ? 'text-emerald-600 dark:text-emerald-400' : (isUserChoice ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400')}">${key}.</span>
+                      <span class="leading-relaxed">${escapeHtml(optText)}</span>
+                    </div>
+                    ${tag}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+
+            ${d.explanation ? `
+              <div class="text-xs bg-slate-50 dark:bg-slate-950/80 p-4 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 leading-relaxed space-y-1">
+                <strong class="text-amber-700 dark:text-amber-400 font-bold block uppercase tracking-wider text-[10px]">
+                  <i class="fa-solid fa-scale-balanced mr-1"></i> Statutory Rationale & Legal Precedents:
+                </strong>
+                <p class="leading-relaxed text-slate-800 dark:text-slate-200">${d.explanation}</p>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function filterReviewList(filterType) {
+      currentReviewFilter = filterType;
+      ['all', 'incorrect', 'correct', 'unattempted'].forEach(f => {
+        const idMap = { all: 'rf-all', incorrect: 'rf-inc', correct: 'rf-cor', unattempted: 'rf-unatt' };
+        const btn = document.getElementById(idMap[f]);
+        if (btn) {
+          if (f === filterType) {
+            btn.className = 'px-3 py-1.5 rounded-lg bg-amber-500 text-white font-semibold';
+          } else {
+            btn.className = 'px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-semibold border border-slate-200 dark:border-transparent';
+          }
+        }
+      });
+      renderReviewCards(lastExamResultDetails);
+    }
+
+    function resetMockArena() {
+      document.getElementById('mock-result-screen').classList.add('hidden');
+      document.getElementById('mock-active-arena').classList.add('hidden');
+      document.getElementById('mock-launcher-screen').classList.remove('hidden');
+    }
+
+    function handleGlobalKeydown(e) {
+      if (document.getElementById('mock-active-arena').classList.contains('hidden')) return;
+      if (['input', 'textarea'].includes(document.activeElement.tagName.toLowerCase())) return;
+
+      const q = activeMockQuestions[activeMockIndex];
+      if (!q) return;
+
+      if (e.key === 'ArrowRight' || e.key === 'Enter') {
+        nextArenaQuestion();
+      } else if (e.key === 'ArrowLeft') {
+        prevArenaQuestion();
+      } else if (['1', 'a', 'A'].includes(e.key)) {
+        selectArenaAnswer(q.id, 'A');
+        renderActiveArenaQuestion();
+      } else if (['2', 'b', 'B'].includes(e.key)) {
+        selectArenaAnswer(q.id, 'B');
+        renderActiveArenaQuestion();
+      } else if (['3', 'c', 'C'].includes(e.key)) {
+        selectArenaAnswer(q.id, 'C');
+        renderActiveArenaQuestion();
+      } else if (['4', 'd', 'D'].includes(e.key)) {
+        selectArenaAnswer(q.id, 'D');
+        renderActiveArenaQuestion();
+      } else if (e.key === 'm' || e.key === 'M') {
+        toggleMarkReview();
+      } else if (e.key === 'c' || e.key === 'C') {
+        clearCurrentSelection();
+      }
+    }
+
+    // ─── 4. CASE LAWS ───────────────────────────────────────────────────────
+    async function loadCaseLawsData() {
+      try {
+        const res = await fetch('/api/case-laws');
+        allCaseLawsCache = await res.json();
+        renderCaseLawsList(allCaseLawsCache);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderCaseLawsList(cases) {
+      const container = document.getElementById('case-laws-grid-container');
+      if (!cases.length) {
+        container.innerHTML = '<p class="col-span-2 text-center text-xs text-slate-400 py-12">No matching precedents found.</p>';
+        return;
+      }
+
+      container.innerHTML = cases.map(c => `
+        <div class="bg-white dark:bg-[#131d31] border border-slate-200/80 dark:border-slate-800 p-6 rounded-2xl flex flex-col justify-between space-y-4 shadow-sm">
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+              <span class="font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-500/20">${c.court} (${c.year})</span>
+              <span class="font-mono text-[11px]">${c.citation || ''}</span>
+            </div>
+            <h4 class="font-bold text-slate-900 dark:text-white text-base sm:text-lg">${c.case_name}</h4>
+            <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">${c.facts || ''}</p>
+          </div>
+
+          <div class="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1.5">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 flex items-center gap-1">
+              Core Examination Principle
+            </span>
+            <p class="text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
+              ${c.exam_principle || c.judgment || ''}
+            </p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function filterCaseLawsLive() {
+      const term = document.getElementById('case-law-search-box').value.toLowerCase();
+      let filtered = allCaseLawsCache.filter(c => 
+        (c.case_name && c.case_name.toLowerCase().includes(term)) ||
+        (c.exam_principle && c.exam_principle.toLowerCase().includes(term)) ||
+        (c.facts && c.facts.toLowerCase().includes(term)) ||
+        (c.court && c.court.toLowerCase().includes(term))
+      );
+
+      if (currentCaseLawFilter !== 'all') {
+        filtered = filtered.filter(c => (c.court && c.court.includes(currentCaseLawFilter)) || (c.exam_principle && c.exam_principle.includes(currentCaseLawFilter)));
+      }
+
+      renderCaseLawsList(filtered);
+    }
+
+    function setCaseLawFilter(f) {
+      currentCaseLawFilter = f;
+      ['all', 'Supreme Court', 'NCLAT', 'Section 7', 'Moratorium'].forEach(key => {
+        const idMap = { 'all': 'clf-all', 'Supreme Court': 'clf-sc', 'NCLAT': 'clf-nclat', 'Section 7': 'clf-sec7', 'Moratorium': 'clf-mor' };
+        const btn = document.getElementById(idMap[key]);
+        if (btn) {
+          if (key === f) {
+            btn.className = 'px-3.5 py-1.5 rounded-xl bg-amber-500 text-white font-semibold';
+          } else {
+            btn.className = 'px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700';
+          }
+        }
+      });
+      filterCaseLawsLive();
+    }
+
+    // ─── 5. CASE STUDIES ────────────────────────────────────────────────────
+    let allCaseStudiesList = [];
+
+    async function loadCaseStudiesData() {
+      try {
+        const res = await fetch('/api/case-studies');
+        allCaseStudiesList = await res.json();
+        
+        const container = document.getElementById('case-studies-cards-grid');
+        container.innerHTML = allCaseStudiesList.map(s => {
+          const isAttempted = s.attempted_questions > 0;
+          return `
+            <div onclick="launchCaseStudySolver(${s.id})" class="bg-white dark:bg-[#131d31] border border-slate-200/80 dark:border-slate-800 hover:border-amber-500/60 p-6 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition shadow-sm group cursor-pointer">
+              <div class="space-y-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-[10px] font-bold px-2.5 py-0.5 rounded bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 uppercase tracking-wider">${s.topic || 'CIRP'}</span>
+                  <span class="text-xs text-slate-500 dark:text-slate-400 font-mono">Standard Level ${s.difficulty || 2}</span>
+                  ${isAttempted ? `
+                    <span class="text-[10px] font-bold px-2.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                      Attempted: ${s.attempted_questions}/${s.total_questions} (${s.marks_earned > 0 ? '+' : ''}${s.marks_earned} Marks)
+                    </span>
+                  ` : `
+                    <span class="text-[10px] font-mono text-slate-400">
+                      ${s.total_questions} Questions • ${s.max_marks} Marks
+                    </span>
+                  `}
+                </div>
+                <h4 class="font-bold text-slate-900 dark:text-white text-base group-hover:text-amber-600 dark:group-hover:text-amber-400 transition">${s.title}</h4>
+                <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">${s.scenario ? s.scenario.slice(0, 150) + '...' : 'High-scoring scenario carrying multiple interconnected sub-questions (+4 marks each).'}</p>
+              </div>
+              <button onclick="event.stopPropagation(); launchCaseStudySolver(${s.id})" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-5 py-2.5 rounded-xl shadow-sm transition shrink-0 flex items-center gap-2">
+                <span>${isAttempted ? 'Review / Continue' : 'Open Case Study'}</span> <i class="fa-solid fa-arrow-right text-[10px]"></i>
+              </button>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function launchCaseStudySolver(id) {
+      try {
+        const res = await fetch(`/api/case-studies/${id}`);
+        const study = await res.json();
+
+        document.getElementById('cs-active-title').innerText = study.title;
+        document.getElementById('cs-active-topic').innerText = study.topic || 'CIRP';
+        document.getElementById('cs-active-scenario').innerText = study.scenario;
+
+        const qListContainer = document.getElementById('cs-active-questions-list');
+        qListContainer.innerHTML = (study.questions || []).map((q, idx) => {
+          const hasAnswered = q.user_answer !== null && q.user_answer !== undefined;
+          return `
+            <div class="bg-white dark:bg-[#131d31] border border-slate-200 dark:border-slate-800 p-6 rounded-2xl space-y-4 shadow-sm" id="cs-box-${q.id}">
+              <div class="flex items-center justify-between text-xs border-b border-slate-200 dark:border-slate-800 pb-2">
+                <span class="font-bold text-slate-800 dark:text-slate-300">Question ${idx + 1}</span>
+                <div class="flex items-center gap-2">
+                  <span class="font-mono font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-500/20">+4.00 Marks</span>
+                  <span class="font-mono font-bold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 px-2.5 py-0.5 rounded border border-rose-200 dark:border-rose-500/20">-1.00 Penalty</span>
+                </div>
+              </div>
+
+              <p class="text-xs sm:text-sm text-slate-900 dark:text-white font-medium leading-relaxed">${escapeHtml(q.question)}</p>
+
+              <div class="space-y-2">
+                ${['A','B','C','D'].map(k => {
+                  const optText = q['option_' + k.toLowerCase()];
+                  if (!optText) return '';
+                  const isChecked = q.user_answer === k;
+                  return `
+                    <label class="flex items-start gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 hover:border-slate-300 dark:hover:border-slate-700 transition cursor-pointer text-xs select-none">
+                      <input type="radio" name="cs_opt_${q.id}" value="${k}" ${isChecked ? 'checked' : ''} onchange="submitCaseStudyQuestion(${study.id}, ${q.id}, '${k}')" class="mt-0.5 text-amber-500 focus:ring-0">
+                      <span class="text-slate-800 dark:text-slate-200"><strong class="text-amber-700 dark:text-amber-400 mr-1">${k}.</strong> ${escapeHtml(optText)}</span>
+                    </label>
+                  `;
+                }).join('')}
+              </div>
+
+              <div id="cs-resp-${q.id}" class="${hasAnswered ? 'p-3.5 rounded-xl text-xs leading-relaxed border ' + (q.is_correct ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300' : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-700 text-rose-800 dark:text-rose-300') : 'hidden p-3.5 rounded-xl text-xs leading-relaxed'}">
+                ${hasAnswered ? (q.is_correct ? `<strong>✓ Correct (+${q.marks_earned} Marks)</strong><p class="mt-1">${q.explanation || ''}</p>` : `<strong>✗ Incorrect (${q.marks_earned} Marks)</strong><p class="mt-1">${q.explanation || ''}</p>`) : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        document.getElementById('case-studies-cards-grid').classList.add('hidden');
+        document.getElementById('cs-solver-view').classList.remove('hidden');
+        showToast(`Loaded "${study.title}"`, 'info');
+      } catch (err) {
+        showToast('Failed to open case study', 'error');
+      }
+    }
+
+    async function submitCaseStudyQuestion(studyId, qId, choice) {
+      try {
+        const res = await fetch(`/api/case-studies/${studyId}/answer`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question_id: qId, selected_answer: choice })
+        });
+        const data = await res.json();
+
+        const box = document.getElementById(`cs-resp-${qId}`);
+        box.classList.remove('hidden', 'bg-emerald-50', 'dark:bg-emerald-950/40', 'border-emerald-300', 'dark:border-emerald-700', 'text-emerald-800', 'dark:text-emerald-300', 'bg-rose-50', 'dark:bg-rose-950/40', 'border-rose-300', 'dark:border-rose-700', 'text-rose-800', 'dark:text-rose-300');
+        box.classList.add('border');
+
+        if (data.correct) {
+          box.classList.add('bg-emerald-50', 'dark:bg-emerald-950/40', 'border-emerald-300', 'dark:border-emerald-700', 'text-emerald-800', 'dark:text-emerald-300');
+          box.innerHTML = `<strong>✓ Correct (+${data.marks_earned} Marks)</strong><p class="mt-1">${data.explanation || ''}</p>`;
+          showToast('+4.00 Marks added', 'success');
+        } else {
+          box.classList.add('bg-rose-50', 'dark:bg-rose-950/40', 'border-rose-300', 'dark:border-rose-700', 'text-rose-800', 'dark:text-rose-300');
+          box.innerHTML = `<strong>✗ Incorrect (${data.marks_earned} Marks)</strong> — Official Answer: ${data.correct_answer}<p class="mt-1">${data.explanation || ''}</p>`;
+          showToast('-1.00 Mark deducted', 'warning');
+        }
+
+        loadDashboardData();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function closeCaseStudySolver() {
+      document.getElementById('cs-solver-view').classList.add('hidden');
+      document.getElementById('case-studies-cards-grid').classList.remove('hidden');
+      loadCaseStudiesData();
+    }
+
+    // ─── 6. WEAK AREAS & PRACTICE ───────────────────────────────────────────
+    async function loadWeakAreasAndRecs() {
+      try {
+        const [wRes, rRes] = await Promise.all([
+          fetch('/api/weak-areas'),
+          fetch('/api/study/recommendations')
+        ]);
+        const weak = await wRes.json();
+        const recs = await rRes.json();
+
+        const matrixContainer = document.getElementById('weak-matrix-container');
+        if (weak.length > 0) {
+          matrixContainer.innerHTML = weak.map(w => `
+            <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs hover:border-slate-300 dark:hover:border-slate-700 transition">
+              <div>
+                <span class="font-bold text-slate-900 dark:text-white text-sm">${w.topic}</span>
+                <span class="text-slate-500 dark:text-slate-400 block text-[11px] mt-0.5">${w.subtopic || 'General'} • Classification: <span class="text-blue-600 dark:text-blue-400 font-semibold">${w.weakness_type}</span></span>
+              </div>
+              <div class="text-right">
+                <span class="font-mono font-bold text-rose-600 dark:text-rose-400 text-sm">${w.score}%</span>
+                <span class="text-slate-400 dark:text-slate-500 block text-[10px] font-mono">${w.correct}/${w.attempts} Correct</span>
+              </div>
+            </div>
+          `).join('');
+        }
+
+        const recsContainer = document.getElementById('ai-recs-container');
+        recsContainer.innerHTML = recs.map(r => `
+          <div class="p-4 rounded-xl border ${
+            r.priority === 'high' ? 
+            'border-rose-200 dark:border-rose-500/30 bg-rose-50/60 dark:bg-rose-950/20' : 
+            'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950'
+          } text-xs space-y-1.5 shadow-sm">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-slate-900 dark:text-white text-sm">${r.topic}</span>
+              <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded ${
+                r.priority === 'high' ? 
+                'bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-500/30' : 
+                'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300'
+              }">${r.priority} Priority</span>
+            </div>
+            <p class="text-slate-700 dark:text-slate-300 leading-relaxed">${r.recommendation}</p>
+          </div>
+        `).join('');
+
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function generateWeakAreaDrill() {
+      try {
+        const res = await fetch('/api/weak-areas/practice');
+        const qs = await res.json();
+        const container = document.getElementById('weak-drill-questions-list');
+
+        if (!qs.length) {
+          container.innerHTML = '<p class="text-xs text-slate-500 dark:text-slate-400 text-center py-6">No specific weak topic questions found.</p>';
+          return;
+        }
+
+        container.innerHTML = qs.map((q, idx) => `
+          <div class="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl space-y-3 shadow-sm">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-amber-700 dark:text-amber-400 font-bold">${q.topic} ${q.subtopic ? '— ' + q.subtopic : ''}</span>
+              <span class="font-mono text-emerald-700 dark:text-emerald-400 font-bold">+${q.marks || 1} Mark</span>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-900 dark:text-white font-medium">${q.question}</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              ${['A','B','C','D'].map(k => {
+                const opt = q['option_' + k.toLowerCase()];
+                if (!opt) return '';
+                return `
+                  <button onclick="submitWeakQuestionDirect(this, ${q.id}, '${k}')" class="text-left p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-amber-500 bg-white dark:bg-slate-900/60 text-xs text-slate-800 dark:text-slate-200 transition">
+                    <strong class="text-amber-600 dark:text-amber-400 mr-1">${k}.</strong> ${opt}
+                  </button>
+                `;
+              }).join('')}
+            </div>
+            <div class="drill-feedback hidden p-3 rounded-xl text-xs leading-relaxed"></div>
+          </div>
+        `).join('');
+
+        showToast(`Loaded ${qs.length} targeted questions`, 'success');
+      } catch (err) {
+        showToast('Failed to fetch practice questions', 'error');
+      }
+    }
+
+    async function submitWeakQuestionDirect(btn, qId, choice) {
+      try {
+        const res = await fetch('/api/answer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question_id: qId, selected_answer: choice })
+        });
+        const data = await res.json();
+
+        const card = btn.closest('.space-y-3');
+        const fb = card.querySelector('.drill-feedback');
+        fb.classList.remove('hidden', 'bg-emerald-50', 'dark:bg-emerald-950/40', 'border-emerald-300', 'dark:border-emerald-700', 'text-emerald-800', 'dark:text-emerald-300', 'bg-rose-50', 'dark:bg-rose-950/40', 'border-rose-300', 'dark:border-rose-700', 'text-rose-800', 'dark:text-rose-300');
+        fb.classList.add('border');
+
+        if (data.correct) {
+          fb.classList.add('bg-emerald-50', 'dark:bg-emerald-950/40', 'border-emerald-300', 'dark:border-emerald-700', 'text-emerald-800', 'dark:text-emerald-300');
+          fb.innerHTML = `<strong>✓ Correct (+${data.marks_earned} Marks)</strong><p class="mt-1">${data.explanation || ''}</p>`;
+        } else {
+          fb.classList.add('bg-rose-50', 'dark:bg-rose-950/40', 'border-rose-300', 'dark:border-rose-700', 'text-rose-800', 'dark:text-rose-300');
+          fb.innerHTML = `<strong>✗ Incorrect (${data.marks_earned} Marks)</strong> — Official Answer: ${data.correct_answer}<p class="mt-1">${data.explanation || ''}</p>`;
+        }
+
+        loadDashboardData();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // ─── 7. SYLLABUS & PROGRESS ─────────────────────────────────────────────
+    const SUBTOPIC_STUDY_NOTES = {
+      // IBC
+      'CIRP Initiation': 'Sec 7: Financial creditor default min ₹1 Cr, 14 days NCLT limit. Sec 9: Operational creditor 10-day demand notice (Form 3/4), affidavit of no dispute. Sec 10: Corporate applicant special resolution.',
+      'Moratorium': 'Sec 14: Prohibits suits, transfers, security enforcement, utility cuts. Does not apply to personal guarantors (Sec 14(3)(b)) or supply of essential goods.',
+      'Committee of Creditors': 'Sec 21: Financial creditors only. Related-party FCs have no vote. 66% majority for major decisions (RP appointment, CIRP extension, resolution plan approval). 51% for routine.',
+      'Resolution Plan': 'Sec 30: Min payment to operational & dissenting financial creditors >= liquidation value (Sec 53). Sec 29A disqualifies wilful defaulters, undischarged insolvents, disqualified directors.',
+      'Liquidation': 'Sec 33: Initiated on expiry of 330 days or CoC 66% vote. Sec 53 waterfall priority: CIRP costs > Workmen 24m & Secured creditors > Unsecured FCs > Govt 2 yrs > Equity.',
+      'Pre-Pack (PPIRP)': 'Sec 54A-54O: Exclusively for MSMEs (default min ₹10 Lakhs). Debtor-in-possession with creditor oversight. Completed within 120 days (90d RP submission + 30d NCLT).',
+      'Individual Insolvency': 'Part III: Fresh Start (qualifying debt <= ₹35,000, income <= ₹60,000, assets <= ₹20,000). Insolvency Resolution Process and Bankruptcy before DRT.',
+      'Cross-border Insolvency': 'Sec 234 & 235: Bilateral agreements with foreign countries and letters of request to foreign courts (UNCITRAL Model Law integration pending).',
+      'Avoidance Transactions': 'Sec 43 (Preferential: 1 yr / 2 yrs related), Sec 45 (Undervalued: 1 yr / 2 yrs related), Sec 49 (Defrauding creditors), Sec 50 (Extortionate credit: 2 yrs), Sec 66 (Fraudulent trading).',
+      'Voluntary Liquidation': 'Sec 59: Corporate debtor with no debt or capacity to pay all debts in full within 3 years. Declaration by majority directors + 75% special resolution within 4 weeks.',
+
+      // Rules & Regulations
+      'IBBI (CIRP) Regulations': 'Reg 35A (Avoidance opinion by 75d, determination by 115d, filing by 135d). Reg 36A Form G by 60d. Reg 27 two registered valuers by 47d. Reg 38 mandatory plan contents.',
+      'IBBI (Liquidation Process) Regulations': 'Reg 44: Liquidate within 1 year. Reg 31A Stakeholders’ Consultation Committee (SCC). Reg 32 modes of sale including going concern.',
+      'IBBI (IP) Regulations': 'First Schedule Code of Conduct: Objectivity, independence, no gifts/conflict of interest, timely disclosure of relationship, maintenance of records.',
+      'IBBI (IPA) Regulations': 'Registration and governance of Insolvency Professional Agencies (ICSI IIP, IPA of ICAI, IPA of ICAI-Cost). Disciplinary mechanisms and monitoring.',
+      'IBBI (Voluntary Liquidation) Regulations': 'Liquidator appointment, claim verification within 30 days, distribution within 30 days of realization, completion within 90-270 days.',
+      'IBBI (Pre-Pack) Regulations': 'Base Resolution Plan Swiss Challenge (Reg 48). Evaluation matrix and scoring criteria approval by CoC.',
+      'IBBI (Grievance) Regulations': 'Regulations 2017: Redressal of grievances against IPs, IPAs, and IUs within 45 days.',
+      'IBBI (Model Bye-Laws) Regulations': 'Governing boards of IPAs, minimum 50% independent directors, monitoring committee, disciplinary committee.',
+
+      // Business Laws
+      'Companies Act 2013': 'Sec 186 loans/guarantees limits (60%/100%), Sec 134 DRS, Sec 164 director disqualifications, Sec 241-242 oppression/mismanagement, Sec 271-272 winding up.',
+      'Contract Act 1872': 'Sec 124-125 Indemnity, Sec 126-147 Guarantee (surety liability co-extensive Sec 128), Sec 56 Frustration/impossibility, Sec 73-74 Damages.',
+      'Transfer of Property Act 1882': 'Sec 58 Mortgages (Simple, Conditional Sale, Usufructuary, English, Deposit of Title Deeds / Equitable, Anomalous), Sec 53 fraudulent transfers.',
+      'Sale of Goods Act 1930': 'Condition vs Warranty (Sec 12), Passing of property (Sec 18-26), Unpaid seller rights (Sec 45-54: Lien, Stoppage in transit, Resale).',
+      'Partnership Act 1932': 'Sec 4 Partnership definition, Sec 30 Minor admitted to benefits, Sec 69 Non-registration effect (bar on filing suits against 3rd parties), Dissolution.',
+      'LLP Act 2008': 'Sec 7 Designated partners (min 2, one resident in India), Sec 23 LLP Agreement, Sec 27-28 Partner liability limited, Sec 63-65 Winding up & dissolution.',
+
+      // General Laws
+      'SARFAESI Act 2002': 'Sec 13(2) 60-day demand notice, Sec 13(4) possession/management takeover without court intervention, Sec 14 DM/CMM assistance, Sec 17 DRT appeal within 45 days.',
+      'RDDBFI Act 1993': 'Debt Recovery Tribunal (DRT) jurisdiction (threshold ₹20 Lakhs), Recovery Officer powers under Sec 25-28, DRAT appeals within 30 days (50% pre-deposit).',
+      'Prevention of Fraud (SFIO)': 'Sec 211-212 Companies Act 2013: Investigation on Central Govt order, designated SFIO officers, arrest powers (Sec 212(8)), twin bail conditions (Sec 212(6)).',
+      'Competition Act 2002': 'Sec 3 anti-competitive agreements, Sec 4 abuse of dominant position, Sec 5-6 combinations (mergers/acquisitions). Sec 31(4) IBC: CCI approval before CoC vote.',
+      'FEMA': 'FEMA 1999: Capital account vs Current account transactions, FDI non-debt instruments rules 2019, overseas resolution applicants compliance.',
+      'Income Tax (IBC context)': 'Sec 79(2)(c) loss carry-forward exemption for IBC resolution plans, Sec 115JB MAT relief, Sec 28(iv) tax on debt waiver.',
+      'Stamp Act': 'Indian Stamp Act 1899: Sec 35 inadmissible in evidence if not duly stamped, impounding of documents, payment of deficit duty + penalty.',
+
+      // Finance & Accounts
+      'Financial Statements Analysis': 'Balance Sheet, P&L, Cash Flows (Operating, Investing, Financing). Liquidity ratios (Current, Quick), Solvency ratios (Debt-Equity, ICR).',
+      'Valuation Principles': 'Discounted Cash Flow (DCF), Net Asset Value (NAV), Comparable Companies Multiple (CCM). CIRP Reg 2(1)(hb) Fair Value vs Reg 2(1)(k) Liquidation Value.',
+      'Corporate Finance Basics': 'Working capital cycle, capital structure theories, enterprise value vs equity value, debt haircut, debt-to-equity conversion.',
+      'Accounting Standards (IBC context)': 'Ind AS 1 (Going Concern assessment), Ind AS 109 (Financial instruments derecognition / debt restructuring), Ind AS 37 (Provisions & Contingent liabilities).',
+
+      // General Awareness
+      'IBBI': 'Sec 188 Constitution: Chairperson + 3 Central Govt + 1 RBI + 5 Nominated. Sec 196 Functions: Regulation of IPs, IPAs, IUs, conducting exams, enforcing standards.',
+      'Insolvency Ecosystem': 'BLRC Report 2015, Information Utilities (NeSL), Insolvency Professional Entities (IPEs), Registered Valuer Organisations (RVOs).',
+      'Recent Amendments': 'Real Estate allottees 100/10% threshold (Sec 7), 330-day outer timeline (Sec 12), PPIRP introduction for MSMEs (2021), Sec 32A clean slate immunity.',
+      'Key Statistics': 'CIRP closure statistics, average realization percentage, average time taken vs liquidation count, resolution vs liquidation economic outcomes.',
+
+      // Case Laws
+      'Supreme Court': 'Swiss Ribbons (constitutional validity), Essar Steel (CoC commercial wisdom & Sec 53 equality of unequals), Mobilox (pre-existing dispute test), Innoventive (default definition).',
+      'High Court': 'Jurisdiction under Article 226/227 in insolvency proceedings, maintainability of writ petitions during CIRP.',
+      'NCLAT': 'Appellate rulings on admission, Section 29A eligibility scrutiny, RP fees, interim relief during pendency of appeals.',
+      'NCLT': 'Adjudicating Authority under Section 60(1), 14-day timeline directory not mandatory, territorial jurisdiction according to corporate debtor registered office.',
+
+      // Case Studies
+      'CIRP Case Studies': 'Comprehensive scenarios involving Section 7/9/10 admission, Section 14 moratorium scope, Section 21 CoC constitution, voting thresholds (51%/66%), and plan approval.',
+      'Liquidation Case Studies': 'Section 53 priority order calculations, secured creditor relinquishment vs realization under Section 52, workmen dues computation (24 months).',
+      'Pre-Pack Case Studies': 'MSME eligibility (Section 54A), Base Resolution Plan Swiss Challenge (Section 54K), termination vs liquidation conversion.',
+      'Individual Insolvency Cases': 'Personal guarantors to corporate debtors (Section 94-100), repayment plans, DRT adjudication, discharge orders.',
+      'Ethics & Professional Conduct': 'Conflict of interest scenarios, fee transparency, disclosure obligations under IBBI IP Regulations First Schedule.',
+      'Business Laws Application': 'Corporate debtor contracts, corporate guarantee enforcement against parent entity, director liabilities for misfeasance.',
+      'Cross-topic Application': 'Integrated scenarios combining IBC, SARFAESI, Companies Act, Income Tax, and landmark Supreme Court precedents.'
+    };
+
+    let expandedSyllabusTopics = new Set(['IBC', 'Case Studies', 'Rules & Regulations']);
+
+    function toggleSyllabusTopicExpand(topic) {
+      if (expandedSyllabusTopics.has(topic)) {
+        expandedSyllabusTopics.delete(topic);
+      } else {
+        expandedSyllabusTopics.add(topic);
+      }
+      loadSyllabusData();
+    }
+
+    function launchTopicPracticeFromSyllabus(topic) {
+      switchTab('mock');
+      const picker = document.getElementById('mock-subject-picker');
+      if (picker) {
+        for (let opt of picker.options) {
+          if (opt.value === topic || opt.text.includes(topic)) {
+            picker.value = opt.value;
+            break;
+          }
+        }
+      }
+      startSubjectMock();
+    }
+
+    function consultFacultyForTopic(topic, subtopic) {
+      switchTab('chat');
+      const prompt = `Please provide an expert statutory breakdown on ${topic} — specifically focusing on ${subtopic}. Include relevant Section numbers, rules, timelines, and common examination pitfalls.`;
+      sendChatMessage(prompt);
+    }
+
+    async function loadSyllabusData() {
+      try {
+        const [sRes, pRes] = await Promise.all([
+          fetch('/api/syllabus'),
+          fetch('/api/study/progress')
+        ]);
+        const syllabus = await sRes.json();
+        const progress = await pRes.json();
+
+        const progMap = {};
+        let masteredCount = 0;
+        let totalSubtopics = 0;
+
+        progress.forEach(p => {
+          progMap[`${p.topic}_${p.subtopic}`] = p.status;
+          if (p.status === 'mastered') masteredCount++;
+        });
+
+        syllabus.forEach(s => totalSubtopics += (s.subtopics || []).length);
+
+        const pctMastered = totalSubtopics ? Math.round((masteredCount / totalSubtopics) * 100) : 0;
+        const statEl = document.getElementById('syllabus-mastered-stat');
+        if (statEl) statEl.innerText = `${pctMastered}% (${masteredCount}/${totalSubtopics} Subtopics Mastered)`;
+
+        const container = document.getElementById('syllabus-cards-container');
+        if (container) {
+          container.innerHTML = syllabus.map(s => {
+            const isExpanded = expandedSyllabusTopics.has(s.topic);
+            const acc = parseFloat(s.accuracy || 0);
+            const attempts = s.attempts || 0;
+            const correct = s.correct || 0;
+
+            let badgeClass = 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700';
+            let badgeText = 'Unassessed';
+            let recFeedback = 'Take a topic drill to evaluate your knowledge base.';
+
+            if (attempts > 0) {
+              if (acc >= 75) {
+                badgeClass = 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800';
+                badgeText = `Strong (${acc}%)`;
+                recFeedback = 'High proficiency! Maintain accuracy by reviewing minute procedural timelines.';
+              } else if (acc >= 50) {
+                badgeClass = 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800';
+                badgeText = `Developing (${acc}%)`;
+                recFeedback = 'Moderate score. Fortify scenario application and landmark case law precedents.';
+              } else {
+                badgeClass = 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-800';
+                badgeText = `Needs Revision (${acc}%)`;
+                recFeedback = 'Priority area! Focus on reading the underlying statutory provisions and practice drills.';
+              }
+            }
+
+            return `
+              <div class="bg-white dark:bg-[#131d31] border border-slate-200/80 dark:border-slate-800 rounded-2xl transition shadow-sm overflow-hidden">
+                <!-- Clickable Topic Header -->
+                <div onclick="toggleSyllabusTopicExpand('${s.topic}')" class="p-6 cursor-pointer hover:bg-slate-50/70 dark:hover:bg-slate-850/40 transition flex flex-col gap-3 select-none">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                      <span class="w-6 h-6 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xs transition transform ${isExpanded ? 'rotate-90' : ''}">
+                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                      </span>
+                      <h4 class="font-bold text-slate-900 dark:text-white text-base">${s.topic}</h4>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs font-bold font-mono px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
+                        ${s.weight}% Weightage
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Performance Bar & Metric -->
+                  <div class="space-y-1.5 pt-1">
+                    <div class="flex items-center justify-between text-xs">
+                      <span class="text-slate-500 dark:text-slate-400">Mock Performance: <strong class="text-slate-800 dark:text-slate-200 font-mono">${attempts > 0 ? `${correct}/${attempts} Correct (${acc}%)` : 'No attempts logged'}</strong></span>
+                      <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeClass}">${badgeText}</span>
+                    </div>
+                    <div class="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div class="${acc >= 75 ? 'bg-emerald-500' : (acc >= 50 ? 'bg-amber-500' : 'bg-rose-500')} h-full rounded-full transition-all duration-500" style="width: ${acc}%"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Expandable Subtopics List -->
+                ${isExpanded ? `
+                  <div class="border-t border-slate-100 dark:border-slate-800 p-6 pt-4 space-y-4 bg-slate-50/50 dark:bg-slate-950/40">
+                    <div class="p-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-500/20 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between gap-3">
+                      <span><strong>Faculty Advisory:</strong> ${recFeedback}</span>
+                      <button onclick="launchTopicPracticeFromSyllabus('${s.topic}')" class="shrink-0 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-[11px] px-3 py-1.5 rounded-lg shadow-sm transition">
+                        Practice ${s.topic}
+                      </button>
+                    </div>
+
+                    <div class="space-y-3">
+                      ${(s.subtopics || []).map(sub => {
+                        const status = progMap[`${s.topic}_${sub}`] || 'not_started';
+                        const statusLabels = { not_started: 'Not Started', studying: 'Under Revision', mastered: 'Mastered' };
+                        const statusClasses = {
+                          not_started: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700',
+                          studying: 'bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30',
+                          mastered: 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30'
+                        };
+                        const note = SUBTOPIC_STUDY_NOTES[sub] || 'Core syllabus topic for Limited Insolvency Examination. Focus on sections, timelines, and statutory exceptions.';
+
+                        return `
+                          <div class="bg-white dark:bg-[#131d31] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-2.5 shadow-sm">
+                            <div class="flex items-center justify-between flex-wrap gap-2">
+                              <span class="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">${sub}</span>
+                              <div class="flex items-center gap-2">
+                                <button onclick="advanceStudyProgress('${s.topic}', '${sub}', '${status}')" class="px-2.5 py-1 rounded-md text-[11px] font-bold border transition ${statusClasses[status]}" title="Click to toggle status">
+                                  ${statusLabels[status]}
+                                </button>
+                                <button onclick="consultFacultyForTopic('${s.topic}', '${sub}')" class="text-[11px] text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+                                  <i class="fa-solid fa-comments"></i> <span>Ask AI</span>
+                                </button>
+                              </div>
+                            </div>
+                            <p class="text-[11px] sm:text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-sans bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800/80">
+                              <strong class="text-amber-600 dark:text-amber-400 font-medium">Study Note:</strong> ${note}
+                            </p>
+                          </div>
+                        `;
+                      }).join('')}
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('');
+        }
+
+        // Progress tab content
+        const progressContainer = document.getElementById('progress-tab-content');
+        if (progressContainer) {
+          progressContainer.innerHTML = syllabus.map(s => {
+            const subs = s.subtopics || [];
+            const completed = subs.filter(sub => progMap[`${s.topic}_${sub}`] === 'mastered').length;
+            const pct = subs.length ? Math.round((completed / subs.length) * 100) : 0;
+            return `
+              <div class="p-5 bg-white dark:bg-[#131d31] border border-slate-200/80 dark:border-slate-800 rounded-2xl space-y-3 shadow-sm">
+                <div class="flex justify-between items-center text-xs">
+                  <span class="font-bold text-slate-900 dark:text-white text-sm">${s.topic} (${s.weight}%)</span>
+                  <span class="font-mono text-emerald-600 dark:text-emerald-400 font-bold">${pct}% (${completed}/${subs.length} Mastered)</span>
+                </div>
+                <div class="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
+                  <div class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+                </div>
+                <div class="flex justify-between items-center text-[11px] pt-1">
+                  <span class="text-slate-500 dark:text-slate-400">Mock Accuracy: <strong class="text-slate-800 dark:text-slate-200 font-mono">${s.attempts > 0 ? `${s.accuracy}%` : 'Unassessed'}</strong></span>
+                  <button onclick="launchTopicPracticeFromSyllabus('${s.topic}')" class="text-amber-600 dark:text-amber-400 font-semibold hover:underline">
+                    Practice &rarr;
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function advanceStudyProgress(topic, subtopic, curStatus) {
+      const nextMap = { not_started: 'studying', studying: 'mastered', mastered: 'not_started' };
+      const next = nextMap[curStatus] || 'studying';
+      try {
+        await fetch('/api/study/progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic, subtopic, status: next })
+        });
+        loadSyllabusData();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // ─── 8. HISTORY ─────────────────────────────────────────────────────────
+    async function loadHistoryData() {
+      try {
+        const res = await fetch('/api/history');
+        const history = await res.json();
+        const tbody = document.getElementById('history-log-table-body');
+
+        if (!history.length) {
+          tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-400 dark:text-slate-500">No attempts logged yet.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = history.map(h => `
+          <tr class="hover:bg-slate-50 dark:hover:bg-slate-850/50">
+            <td class="p-4">
+              <span class="font-bold text-slate-900 dark:text-white block">${h.topic}</span>
+              <span class="text-slate-500 dark:text-slate-400 text-xs line-clamp-1">${h.question || 'Practical Case Study Scenario'}</span>
+            </td>
+            <td class="p-4 font-mono font-bold text-slate-700 dark:text-slate-300">${h.selected_answer || '-'}</td>
+            <td class="p-4">
+              <span class="px-2.5 py-0.5 rounded text-[10px] font-bold ${
+                h.is_correct ? 
+                'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30' : 
+                'bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30'
+              }">
+                ${h.is_correct ? 'CORRECT' : 'INCORRECT'}
+              </span>
+            </td>
+            <td class="p-4 font-mono font-bold ${h.marks_earned > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}">
+              ${h.marks_earned > 0 ? '+' : ''}${h.marks_earned}
+            </td>
+            <td class="p-4 text-slate-500 dark:text-slate-400 font-mono text-[11px]">${h.error_type || '-'}</td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  </script>
+</body>
+</html>

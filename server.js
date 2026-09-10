@@ -15,7 +15,7 @@ initDB();
 
 // Gemini client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+const geminiModel = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-3.6-flash' });
 
 app.use(express.json());
 app.use(cors({ origin: true, credentials: true }));
@@ -55,7 +55,26 @@ const SYLLABUS = [
 
 // GET syllabus
 app.get('/api/syllabus', (req, res) => {
-  res.json(SYLLABUS);
+  const sid = req.session.userId;
+  const topicStats = db.prepare(`
+    SELECT topic, COUNT(*) as attempts, SUM(is_correct) as correct,
+    ROUND(100.0 * SUM(is_correct) / COUNT(*), 1) as accuracy
+    FROM attempts WHERE session_id = ? GROUP BY topic
+  `).all(sid);
+  
+  const statsMap = {};
+  topicStats.forEach(ts => statsMap[ts.topic] = ts);
+
+  const enriched = SYLLABUS.map(s => {
+    const stat = statsMap[s.topic] || { attempts: 0, correct: 0, accuracy: 0 };
+    return {
+      ...s,
+      attempts: stat.attempts,
+      correct: stat.correct,
+      accuracy: stat.accuracy
+    };
+  });
+  res.json(enriched);
 });
 
 // GET questions by topic/subtopic
@@ -184,6 +203,46 @@ function updateWeakArea(sessionId, question, is_correct, error_type) {
 
 // ─── MOCK TEST ROUTES ────────────────────────────────────────────────────────
 
+function getNonRepeatingQuestions(sessionId, conditionSql, params, limit) {
+  // 1. Prioritize questions that the user has NEVER attempted
+  let sql1 = `SELECT id, marks FROM questions WHERE ${conditionSql} AND id NOT IN (SELECT question_id FROM attempts WHERE session_id = ?) ORDER BY RANDOM() LIMIT ?`;
+  let qs = db.prepare(sql1).all(...params, sessionId, limit);
+
+  // 2. If pool is exhausted, backfill with least-recently attempted questions
+  if (qs.length < limit) {
+    const needed = limit - qs.length;
+    const excludeIds = qs.map(q => q.id);
+    let excludeClause = excludeIds.length ? `AND id NOT IN (${excludeIds.map(() => '?').join(',')})` : '';
+    let sql2 = `SELECT id, marks FROM questions WHERE ${conditionSql} ${excludeClause} ORDER BY (SELECT COALESCE(MAX(created_at), 0) FROM attempts WHERE question_id = questions.id AND session_id = ?) ASC, RANDOM() LIMIT ?`;
+    let backfill = db.prepare(sql2).all(...params, ...excludeIds, sessionId, needed);
+    qs = qs.concat(backfill);
+  }
+  return qs;
+}
+
+function buildFullMock(sessionId) {
+  const result = [];
+  // Case Studies: ~10 questions × 4 marks = 40 marks
+  result.push(...getNonRepeatingQuestions(sessionId, "topic = 'Case Studies'", [], 10));
+  // IBC: 6 questions
+  result.push(...getNonRepeatingQuestions(sessionId, "topic = 'IBC'", [], 6));
+  // Rules & Regulations: 4 questions
+  result.push(...getNonRepeatingQuestions(sessionId, "topic = 'Rules & Regulations'", [], 4));
+  // Business Laws: 3 questions
+  result.push(...getNonRepeatingQuestions(sessionId, "topic = 'Business Laws'", [], 3));
+  // General Laws: 3 questions
+  result.push(...getNonRepeatingQuestions(sessionId, "topic = 'General Laws'", [], 3));
+  // Finance & Accounts / General Awareness: 3 questions
+  result.push(...getNonRepeatingQuestions(sessionId, "topic IN ('Finance & Accounts','General Awareness')", [], 3));
+  
+  // Shuffle order
+  return result.sort(() => Math.random() - 0.5);
+}
+
+function buildCaseLawQuiz(sessionId, n) {
+  return getNonRepeatingQuestions(sessionId, "topic IN ('IBC') AND tags LIKE '%CaseLaw%'", [], n);
+}
+
 app.post('/api/mock/start', (req, res) => {
   const { type = 'full', topic, num_questions } = req.body;
   const sessionId = req.session.userId;
@@ -193,22 +252,16 @@ app.post('/api/mock/start', (req, res) => {
   const duration = type === 'full' ? 7200 : (type === 'quick' ? 1800 : 3600);
 
   if (type === 'full') {
-    // Official structure: ~25 questions × 4 marks = 100 marks (case studies dominate)
-    questions = buildFullMock();
+    questions = buildFullMock(sessionId);
   } else if (type === 'topic' && topic) {
-    const qs = db.prepare('SELECT id, marks FROM questions WHERE topic = ? ORDER BY RANDOM() LIMIT ?')
-      .all(topic, num_questions || 15);
-    questions = qs;
+    questions = getNonRepeatingQuestions(sessionId, 'topic = ?', [topic], num_questions || 15);
   } else if (type === 'case-study') {
-    const qs = db.prepare('SELECT id, marks FROM questions WHERE topic = \'Case Studies\' ORDER BY RANDOM() LIMIT ?')
-      .all(num_questions || 10);
-    questions = qs;
+    questions = getNonRepeatingQuestions(sessionId, "topic = 'Case Studies'", [], num_questions || 10);
   } else if (type === 'case-law') {
-    // Generate questions from case laws
-    questions = buildCaseLawQuiz(num_questions || 10);
+    questions = buildCaseLawQuiz(sessionId, num_questions || 10);
   } else {
-    const qs = db.prepare('SELECT id, marks FROM questions ORDER BY RANDOM() LIMIT ?').all(num_questions || 20);
-    questions = qs;
+    // Quick test: 15 questions, non-repeating across all topics
+    questions = getNonRepeatingQuestions(sessionId, '1=1', [], num_questions || 15);
   }
 
   if (questions.length === 0) return res.status(400).json({ error: 'No questions available' });
@@ -227,39 +280,6 @@ app.post('/api/mock/start', (req, res) => {
 
   res.json({ mock_id: mockId, questions: fullQuestions, duration, max_marks: maxMarks, type });
 });
-
-function buildFullMock() {
-  const result = [];
-  // Case Studies: ~70 marks = ~17-18 questions × 4 marks
-  const csQ = db.prepare('SELECT id, marks FROM questions WHERE topic = \'Case Studies\' ORDER BY RANDOM() LIMIT 17').all();
-  result.push(...csQ);
-  // Case Laws: ~5 marks = ~5 questions × 1 mark
-  const clQ = db.prepare('SELECT id, marks FROM questions WHERE topic IN (\'IBC\') AND tags LIKE \'%CaseLaw%\' ORDER BY RANDOM() LIMIT 3').all();
-  result.push(...clQ);
-  // IBC: ~4 marks
-  const ibcQ = db.prepare('SELECT id, marks FROM questions WHERE topic = \'IBC\' AND difficulty <= 2 ORDER BY RANDOM() LIMIT 4').all();
-  result.push(...ibcQ);
-  // Rules: ~6 marks
-  const rulesQ = db.prepare('SELECT id, marks FROM questions WHERE topic = \'Rules & Regulations\' ORDER BY RANDOM() LIMIT 4').all();
-  result.push(...rulesQ);
-  // Business Laws: ~4 marks
-  const blQ = db.prepare('SELECT id, marks FROM questions WHERE topic = \'Business Laws\' ORDER BY RANDOM() LIMIT 4').all();
-  result.push(...blQ);
-  // General Laws: ~7 marks
-  const glQ = db.prepare('SELECT id, marks FROM questions WHERE topic = \'General Laws\' ORDER BY RANDOM() LIMIT 4').all();
-  result.push(...glQ);
-  // Fill remaining
-  const allIBC = db.prepare('SELECT id, marks FROM questions WHERE topic IN (\'IBC\',\'Finance & Accounts\',\'General Awareness\') ORDER BY RANDOM() LIMIT 5').all();
-  result.push(...allIBC);
-  
-  // Shuffle and return
-  return result.sort(() => Math.random() - 0.5);
-}
-
-function buildCaseLawQuiz(n) {
-  // Use IBC/case-law related questions
-  return db.prepare('SELECT id, marks FROM questions WHERE topic IN (\'IBC\',\'Case Studies\') ORDER BY RANDOM() LIMIT ?').all(n);
-}
 
 // GET mock state (survives refresh)
 app.get('/api/mock/:mockId', (req, res) => {
@@ -334,20 +354,59 @@ app.post('/api/mock/:mockId/finish', (req, res) => {
   for (const qId of questionIds) {
     const question = db.prepare('SELECT * FROM questions WHERE id = ?').get(qId);
     if (!question) continue;
-    const selected = answers[qId];
+    const selected = answers[qId] !== undefined ? answers[qId] : null;
     let marks = 0;
     const is_correct = selected === question.correct_answer;
     if (selected) {
       marks = is_correct ? question.marks : -(question.marks * 0.25);
+    } else {
+      // Record unattempted question so it does not repeat immediately in consecutive tests
+      db.prepare(`INSERT INTO attempts (session_id, question_id, mock_id, selected_answer, is_correct, marks_earned, time_taken, topic, subtopic, difficulty, error_type)
+        VALUES (?, ?, ?, NULL, 0, 0, 0, ?, ?, ?, 'unattempted')`)
+        .run(sessionId, qId, mock.id, question.topic, question.subtopic, question.difficulty);
     }
     totalMarks += marks;
-    details.push({ id: qId, topic: question.topic, correct: is_correct, marks_earned: marks, selected, correct_answer: question.correct_answer, explanation: question.explanation, question: question.question });
+    details.push({
+      id: qId,
+      topic: question.topic,
+      subtopic: question.subtopic,
+      question: question.question,
+      option_a: question.option_a,
+      option_b: question.option_b,
+      option_c: question.option_c,
+      option_d: question.option_d,
+      correct: is_correct,
+      marks_earned: parseFloat(marks.toFixed(2)),
+      marks: question.marks,
+      selected: selected,
+      correct_answer: question.correct_answer,
+      explanation: question.explanation
+    });
   }
 
-  db.prepare('UPDATE mocks SET status = \'completed\', end_time = strftime(\'%s\',\'now\'), total_marks = ? WHERE id = ?')
-    .run(totalMarks, mock.id);
+  // Ensure totalMarks is formatted
+  const finalTotalMarks = Math.max(0, parseFloat(totalMarks.toFixed(2)));
 
-  res.json({ total_marks: totalMarks, max_marks: mock.max_marks, details, percentage: ((totalMarks / mock.max_marks) * 100).toFixed(1) });
+  db.prepare('UPDATE mocks SET status = \'completed\', end_time = strftime(\'%s\',\'now\'), total_marks = ? WHERE id = ?')
+    .run(finalTotalMarks, mock.id);
+
+  const correctCount = details.filter(d => d.selected && d.correct).length;
+  const incorrectCount = details.filter(d => d.selected && !d.correct).length;
+  const unattemptedCount = details.filter(d => !d.selected).length;
+  const positiveMarks = details.reduce((sum, d) => sum + (d.selected && d.correct ? d.marks_earned : 0), 0);
+  const negativeMarks = details.reduce((sum, d) => sum + (d.selected && !d.correct ? Math.abs(d.marks_earned) : 0), 0);
+
+  res.json({
+    total_marks: finalTotalMarks,
+    max_marks: mock.max_marks,
+    percentage: ((finalTotalMarks / mock.max_marks) * 100).toFixed(1),
+    correct_count: correctCount,
+    incorrect_count: incorrectCount,
+    unattempted_count: unattemptedCount,
+    positive_marks: parseFloat(positiveMarks.toFixed(2)),
+    negative_marks: parseFloat(negativeMarks.toFixed(2)),
+    details
+  });
 });
 
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
@@ -428,15 +487,49 @@ app.get('/api/case-laws/:id', (req, res) => {
 // ─── CASE STUDIES ────────────────────────────────────────────────────────────
 
 app.get('/api/case-studies', (req, res) => {
-  const studies = db.prepare('SELECT id, title, topic, difficulty FROM case_studies ORDER BY id').all();
-  res.json(studies);
+  const sid = req.session.userId;
+  const studies = db.prepare('SELECT id, title, scenario, topic, difficulty FROM case_studies ORDER BY id').all();
+  const enriched = studies.map(s => {
+    const totalQs = db.prepare('SELECT count(*) as c FROM case_study_questions WHERE case_study_id = ?').get(s.id).c;
+    const qIds = db.prepare('SELECT id FROM case_study_questions WHERE case_study_id = ?').all(s.id).map(x => x.id);
+    let attemptedCount = 0;
+    let correctCount = 0;
+    let marksEarned = 0;
+    if (qIds.length) {
+      const attempts = db.prepare(`SELECT is_correct, marks_earned FROM attempts WHERE session_id = ? AND question_id IN (${qIds.map(() => '?').join(',')})`).all(sid, ...qIds);
+      attemptedCount = attempts.length;
+      correctCount = attempts.filter(a => a.is_correct === 1).length;
+      marksEarned = attempts.reduce((sum, a) => sum + (a.marks_earned || 0), 0);
+    }
+    return {
+      ...s,
+      total_questions: totalQs,
+      max_marks: totalQs * 4,
+      attempted_questions: attemptedCount,
+      correct_questions: correctCount,
+      marks_earned: parseFloat(marksEarned.toFixed(2))
+    };
+  });
+  res.json(enriched);
 });
 
 app.get('/api/case-studies/:id', (req, res) => {
+  const sid = req.session.userId;
   const cs = db.prepare('SELECT * FROM case_studies WHERE id = ?').get(req.params.id);
   if (!cs) return res.status(404).json({ error: 'Not found' });
   const questions = db.prepare('SELECT id, question, option_a, option_b, option_c, option_d, marks FROM case_study_questions WHERE case_study_id = ?').all(cs.id);
-  res.json({ ...cs, questions });
+  
+  // Attach previous attempt info if candidate already answered
+  const enrichedQuestions = questions.map(q => {
+    const attempt = db.prepare('SELECT selected_answer, is_correct, marks_earned FROM attempts WHERE session_id = ? AND question_id = ? ORDER BY created_at DESC LIMIT 1').get(sid, q.id);
+    return {
+      ...q,
+      user_answer: attempt ? attempt.selected_answer : null,
+      is_correct: attempt ? (attempt.is_correct === 1) : null,
+      marks_earned: attempt ? attempt.marks_earned : null
+    };
+  });
+  res.json({ ...cs, questions: enrichedQuestions });
 });
 
 app.post('/api/case-studies/:id/answer', (req, res) => {
@@ -448,9 +541,15 @@ app.post('/api/case-studies/:id/answer', (req, res) => {
   const is_correct = selected_answer === q.correct_answer ? 1 : 0;
   const marks = is_correct ? q.marks : -(q.marks * 0.25);
 
+  const cs = db.prepare('SELECT * FROM case_studies WHERE id = ?').get(req.params.id);
+  const topicName = 'Case Studies';
+  const subtopicName = cs ? cs.title : 'CIRP Case Studies';
+
   db.prepare(`INSERT INTO attempts (session_id, question_id, selected_answer, is_correct, marks_earned, topic, subtopic, difficulty, error_type)
-    VALUES (?, ?, ?, ?, ?, 'Case Studies', ?, 3, ?)`)
-    .run(sessionId, question_id, selected_answer, is_correct, marks, 'CIRP', is_correct ? null : 'application');
+    VALUES (?, ?, ?, ?, ?, ?, ?, 3, ?)`)
+    .run(sessionId, question_id, selected_answer, is_correct, marks, topicName, subtopicName, is_correct ? null : 'application');
+
+  updateWeakArea(sessionId, { topic: topicName, subtopic: subtopicName, difficulty: 3 }, is_correct, 'application');
 
   res.json({ correct: is_correct === 1, correct_answer: q.correct_answer, explanation: q.explanation, marks_earned: marks });
 });
@@ -635,11 +734,11 @@ ${weakAreas.length > 0 ? weakAreas.map(w => `- ${w.topic}${w.subtopic ? ' (' + w
 RECENT STUDY ACTIVITY:
 ${recentStudy.length > 0 ? recentStudy.map(s => `- ${s.topic}${s.subtopic ? ' - ' + s.subtopic : ''}: ${s.status}`).join('\n') : '- No recent study activity recorded'}`;
 
-  const systemPrompt = `You are an expert AI tutor for the IBBI Limited Insolvency Examination (India). You have deep knowledge of:
+  const systemPrompt = `You are an expert faculty mentor and senior authority on the IBBI Limited Insolvency Examination (India). You have deep knowledge of:
 - Insolvency and Bankruptcy Code 2016 and all amendments up to 4 February 2025
 - IBC Rules and Regulations (CIRP, Liquidation, Voluntary, Pre-Pack, IP, IPA regulations)
 - Business Laws: Companies Act 2013, Contract Act 1872, Transfer of Property Act, Sale of Goods Act, Partnership Act, LLP Act
-- General Laws: SARFAESI 2002, RDDBFI 1993, Competition Act, FEMA
+- General Laws: SARFAESI 2002, RDDBFI 1993, Prevention of Fraud (SFIO), Competition Act, FEMA
 - Key case laws: Essar Steel, Swiss Ribbons, Mobilox, Arcelormittal, Innoventive, K. Sashidhar, Gujarat Urja, Phoenix ARC, Jaypee Infratech
 - Finance, accounts, valuation basics
 - Ethics and professional conduct for Insolvency Professionals
@@ -667,8 +766,8 @@ STUDY GUIDANCE:
 - Recommend practice question types for improvement
 - Advise on time allocation based on syllabus weightage
 
-APP NAVIGATION HELP:
-You can guide users to these tabs: Dashboard, AI Tutor, Syllabus, Mock Test, Case Laws, Case Studies, Weak Areas, Progress, History
+PORTAL NAVIGATION GUIDANCE:
+You can guide candidates to these syllabus modules: Dashboard, Faculty Desk, Syllabus & Weightage, Mock Examination, Landmark Case Laws, Practical Case Studies (70 Marks), Weak Areas, Study Progress, Attempt History.
 Suggest specific actions like "Try a topic test on [weak area]" or "Review case laws for [topic]"
 
 EXAM RELEVANCE:
@@ -704,7 +803,8 @@ IMPORTANT: Laws/regulations as they stood on 4 February 2025. Syllabus effective
     // Return the error message so we can debug
     const fallback = generateFallbackResponse(message, weakAreas, totalAttempts);
     db.prepare('INSERT INTO conversations (session_id, role, content) VALUES (?, ?, ?)').run(sessionId, 'assistant', fallback);
-    res.json({ reply: fallback, fallback: true, debug_error: err.message });  }
+    res.json({ reply: fallback, fallback: true });
+  }
 });
 
 function generateFallbackResponse(message, weakAreas, attempts) {
@@ -724,7 +824,7 @@ function generateFallbackResponse(message, weakAreas, attempts) {
   if (msg.includes('waterfall') || msg.includes('section 53') || msg.includes('liquidation')) {
     return `**Section 53 — Liquidation Waterfall (Priority Order)**\n\n1. CIRP & Liquidation costs\n2. Secured creditors (up to security value) + Workmen dues (24 months)\n3. Other employee dues (12 months)\n4. Unsecured financial creditors\n5. Government dues (up to 2 years)\n6. Remaining secured creditors (post-security)\n7. Operational creditors and other creditors\n8. Preference shareholders\n9. Equity shareholders\n\n*Exam tip: CIRP costs always rank FIRST — higher than even secured creditors.*`;
   }
-  return `AI is currently offline. Here's what I suggest:\n\n${attempts < 10 ? '🎯 Start with a **Topic Test** to build your foundation.' : `📊 You've attempted ${attempts} questions. Check your **Dashboard** for a detailed performance breakdown.`}\n\n${weakAreas.length > 0 ? `⚠️ Focus on weak areas: **${weakAreas.map(w => w.topic).join(', ')}**` : '✅ Keep practicing consistently across all topics.'}\n\nTry asking me about specific sections (e.g., "Explain Section 7", "What is moratorium?", "Explain liquidation waterfall").`;
+  return `**Faculty Study Advisory:**\n\n${attempts < 10 ? '🎯 Start with a **Topic Subject Drill** to master the fundamentals of IBC Sections 1-54.' : `📊 You have completed ${attempts} questions so far. Review your **Dashboard** for topic-wise accuracy.`}\n\n${weakAreas.length > 0 ? `⚠️ Priority Focus Areas: **${weakAreas.map(w => w.topic).join(', ')}**` : '✅ Maintain balanced practice across all 8 syllabus divisions.'}\n\nFeel free to ask for detailed breakdowns of specific provisions (e.g., "Explain Section 7", "What is moratorium under Section 14?", "Explain Section 53 priority waterfall", or "Section 29A disqualifications").`;
 }
 
 // GET conversation history

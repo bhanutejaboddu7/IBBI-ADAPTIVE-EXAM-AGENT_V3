@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Environment variables & secrets (DO NOT COMMIT)
+.env
+
+# SQLite WAL and shared memory temporary files
+*.db-wal
+*.db-shm
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS Files
+.DS_Store
+Thumbs.db
